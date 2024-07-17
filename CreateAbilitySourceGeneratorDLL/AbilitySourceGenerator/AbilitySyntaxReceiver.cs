@@ -6,8 +6,8 @@ namespace AbilitySourceGenerator
 {
     internal class AbilitySyntaxReceiver : ISyntaxReceiver
     {
-        public List<InterfaceDeclarationSyntax> PolymorphicInterfaces = new List<InterfaceDeclarationSyntax>();
-        public List<StructDeclarationSyntax> AllStructs = new List<StructDeclarationSyntax>();
+        public List<InterfaceDeclarationSyntax> polymorphicInterfaces = new List<InterfaceDeclarationSyntax>();
+        public List<StructDeclarationSyntax> allStructs = new List<StructDeclarationSyntax>();
 
         /// <summary>
         /// Called for every syntax node in the compilation, we can inspect the nodes and save any information useful for generation
@@ -17,10 +17,14 @@ namespace AbilitySourceGenerator
             switch (syntaxNode)
             {
                 case InterfaceDeclarationSyntax interfaceStatementSyntax:
-                    PolymorphicInterfaces.Add(interfaceStatementSyntax);
+                    if (!Utils.HasAttribute(interfaceStatementSyntax, "AbilitySource"))
+                    {
+                        break;
+                    }
+                    polymorphicInterfaces.Add(interfaceStatementSyntax);
                     break;
                 case StructDeclarationSyntax structDeclarationSyntax:
-                    AllStructs.Add(structDeclarationSyntax);
+                    allStructs.Add(structDeclarationSyntax);
                     break;
                 default:
                     break;

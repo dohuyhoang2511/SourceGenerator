@@ -4,40 +4,37 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace AbilitySourceGenerator
 {
-    public class Utils
+    public static class Utils
     {
+        public static bool HasAttribute(BaseTypeDeclarationSyntax typeSyntax, string attributeName)
+        {
+            foreach (var attributeList in typeSyntax.AttributeLists)
+            {
+                foreach (var attribute in attributeList.Attributes)
+                {
+                    if (attribute.Name.ToString() == attributeName)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+        
         public static string GetNamespace(BaseTypeDeclarationSyntax syntax)
         {
             string empty = string.Empty;
-            SyntaxNode parent = syntax.Parent;
-            bool loop = true;
-            // int count = 0;
-            // int maxCount = 100;
-            while (loop)
+            SyntaxNode? parent = syntax.Parent;
+            while (true)
             {
-                // count++;
-
-                // if (count < maxCount)
-                // {
-                //     break;
-                // }
-                
                 switch (parent)
                 {
                     case null:
                     case NamespaceDeclarationSyntax _:
                         goto label_3;
-                        // loop = false;
-                        // break;
                     default:
                         parent = parent.Parent;
                         continue;
                 }
-
-                // if (loop == false)
-                // {
-                //     break;
-                // }
             }
 
             label_3:
@@ -48,8 +45,8 @@ namespace AbilitySourceGenerator
         
         public static List<ISymbol> GetAllMemberSymbols(GeneratorExecutionContext context, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
-            SemanticModel semanticModel = context.Compilation.GetSemanticModel(interfaceDeclarationSyntax.SyntaxTree, false);
-            INamedTypeSymbol declaredSymbol = semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax);
+            SemanticModel semanticModel = context.Compilation.GetSemanticModel(interfaceDeclarationSyntax.SyntaxTree);
+            INamedTypeSymbol? declaredSymbol = semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax);
 
             if (declaredSymbol == null)
             {
@@ -61,7 +58,7 @@ namespace AbilitySourceGenerator
         
         private static bool IsNotAPropertyMethod(ISymbol it)
         {
-            if (!(it is IMethodSymbol methodSymbol))
+            if (it is not IMethodSymbol methodSymbol)
                 return true;
             return methodSymbol.MethodKind != MethodKind.PropertyGet && methodSymbol.MethodKind != MethodKind.PropertySet;
         }

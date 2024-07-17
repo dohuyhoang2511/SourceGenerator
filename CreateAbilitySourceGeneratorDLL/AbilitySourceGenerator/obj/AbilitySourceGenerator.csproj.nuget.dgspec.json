@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Archmage\\TowerAscension\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj": {}
+    "D:\\Archmage\\SourceGenerator\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj": {}
   },
   "projects": {
-    "D:\\Archmage\\TowerAscension\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj": {
+    "D:\\Archmage\\SourceGenerator\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Archmage\\TowerAscension\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj",
+        "projectUniqueName": "D:\\Archmage\\SourceGenerator\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj",
         "projectName": "AbilitySourceGenerator",
-        "projectPath": "D:\\Archmage\\TowerAscension\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj",
+        "projectPath": "D:\\Archmage\\SourceGenerator\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj",
         "packagesPath": "C:\\Users\\Huy Hoang\\.nuget\\packages\\",
-        "outputPath": "D:\\Archmage\\TowerAscension\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\obj\\",
+        "outputPath": "D:\\Archmage\\SourceGenerator\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Huy Hoang\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -60,7 +60,7 @@
             "NETStandard.Library": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[2.0.3, )",
+              "version": "[2.0.0, )",
               "autoReferenced": true
             }
           },

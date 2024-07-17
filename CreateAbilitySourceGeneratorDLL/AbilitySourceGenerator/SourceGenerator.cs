@@ -8,12 +8,47 @@ using Microsoft.CodeAnalysis.Text;
 #nullable enable
 namespace AbilitySourceGenerator
 {
+    public class HeaderData
+    {
+        public string scriptName = "";
+        public string interfaceName = "";
+        public string nameSpace = "";
+        public List<string> usingDirectives = new List<string>();
+    }
+
+    public class StructData
+    {
+        public string nameSpace = "";
+        public string structName = "";
+        public List<StructFieldData> fields = new List<StructFieldData>();
+    }
+
+    public class StructFieldData
+    {
+        public string typeName = "";
+        public string fieldName = "";
+        public string mergedFieldName = "";
+    }
+
+    public class MergedFieldData
+    {
+        public string typeName = "";
+        public string fieldName = "";
+        public Dictionary<string, string> fieldNameForStructName = new Dictionary<string, string>();
+    }
+
+    public class ScriptGenerateData
+    {
+        public string scriptName = "";
+        public SourceText sourceText;
+    }
+    
     [Generator]
     public class SourceGenerator : ISourceGenerator
     {
 #nullable disable
-        private const string typeEnumName = "TypeId";
-        private const string typeEnumVarName = "CurrentTypeId";
+        // private const string typeEnumName = "TypeId";
+        // private const string typeEnumVarName = "CurrentTypeId";
 
         /// <summary>
         /// Called before generation occurs. A generator can use the <paramref name="context"/>
@@ -42,46 +77,81 @@ namespace AbilitySourceGenerator
         /// </remarks>
         public void Execute(GeneratorExecutionContext context)
         {
-            if (context.SyntaxReceiver is not AbilitySyntaxReceiver)
+            if (context.SyntaxReceiver is not AbilitySyntaxReceiver syntaxReceiver)
             {
                 return;
             }
 
-            AbilitySyntaxReceiver syntaxReceiver = context.SyntaxReceiver as AbilitySyntaxReceiver;
-
-            if (syntaxReceiver.PolymorphicInterfaces == null || syntaxReceiver.PolymorphicInterfaces.Count == 0)
+            if (syntaxReceiver.polymorphicInterfaces.Count == 0)
             {
                 return;
             }
-            
-            foreach (var interfaceDeclarationSyntax in syntaxReceiver.PolymorphicInterfaces)
+
+            // foreach (var interfaceDeclarationSyntax in syntaxReceiver.polymorphicInterfaces)
+            // {
+            //     HeaderData headerData = GetHeader(interfaceDeclarationSyntax);
+            //     List<ISymbol> allMemberSymbols = Utils.GetAllMemberSymbols(context, interfaceDeclarationSyntax);
+            //     List<StructData> structDataList = BuildStructsData(context, syntaxReceiver, headerData, interfaceDeclarationSyntax);
+            //
+            //     if (structDataList == null || structDataList.Count == 0)
+            //     {
+            //         continue;
+            //     }
+            //
+            //     List<MergedFieldData> mergedFieldData = BuildMergedFields(structDataList);
+            //     SourceText mergedStruct = GenerateMergedStruct(headerData, allMemberSymbols, mergedFieldData, structDataList);
+            //
+            //     context.AddSource(headerData.scriptName, mergedStruct);
+            //
+            //     // DebugInEditorUnity(context, headerData.scriptName, mergedStruct.ToString());
+            //     
+            //     foreach (var structData in structDataList)
+            //     {
+            //         var structScript = GeneratePartialStruct(context, headerData.usingDirectives, headerData.scriptName, structData, mergedFieldData);
+            //         context.AddSource(structScript.scriptName, structScript.sourceText);
+            //     }
+            // }
+
+            foreach (var interfaceDeclarationSyntax in syntaxReceiver.polymorphicInterfaces)
             {
                 GenerateScript(context, syntaxReceiver, interfaceDeclarationSyntax);
             }
         }
 
-        private static void GenerateScript(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+        private void DebugInEditorUnity(GeneratorExecutionContext context, string str)
         {
-            ScriptGenerateData data = GetHeader(context, interfaceDeclarationSyntax);
+            DiagnosticDescriptor descriptor = new DiagnosticDescriptor("Debug", "", $"\n{str}", "",
+                DiagnosticSeverity.Error, true);
+            context.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, DiagnosticSeverity.Error));
+        }
+        
+        private void GenerateScript(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+        {
+            HeaderData headerData = GetHeader(interfaceDeclarationSyntax);
             List<ISymbol> allMemberSymbols = Utils.GetAllMemberSymbols(context, interfaceDeclarationSyntax);
-            List<StructData> structDataList = BuildStructsData(context, syntaxReceiver, data, interfaceDeclarationSyntax);
-
+            List<StructData> structDataList = BuildStructsData(context, syntaxReceiver, headerData, interfaceDeclarationSyntax);
+        
             if (structDataList == null || structDataList.Count == 0)
             {
                 return;
             }
-
-            List<MergedFieldData> mergedFieldData = BuildMergedFields(structDataList);
-            SourceText mergedStruct = GenerateMergedStruct(data, allMemberSymbols, mergedFieldData, structDataList);
-            context.AddSource(data.mergedStructName, mergedStruct);
             
-            foreach (var structData in structDataList)
-            {
-                GeneratePartialStruct(context, data.usingDirectives, data.mergedStructName, structData, mergedFieldData);
-            }
+            List<MergedFieldData> mergedFieldData = BuildMergedFields(structDataList);
+            SourceText mergedStruct = GenerateMergedStruct(headerData, allMemberSymbols, mergedFieldData, structDataList);
+
+            context.AddSource(headerData.scriptName, mergedStruct);
+
+            // DebugInEditorUnity(context, $"headerData.scriptName: {headerData.scriptName} \n headerData.interfaceName: {headerData.interfaceName}");
+            
+            // foreach (var structData in structDataList)
+            // {
+            //     GeneratePartialStruct(context, data.usingDirectives, data.scriptName, structData, mergedFieldData);  
+            // }
+        
+            return;
         }
 
-        private static ScriptGenerateData GetHeader(GeneratorExecutionContext context, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+        private static HeaderData GetHeader(InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
             var identifier = interfaceDeclarationSyntax.Identifier;
             var str = identifier.Text.Substring(1);
@@ -98,10 +168,10 @@ namespace AbilitySourceGenerator
                 TryAddUsing(allUsing, usingDirectiveSyntax.Name.ToString());
             }
 
-            return new ScriptGenerateData()
+            return new HeaderData()
             {
                 interfaceName = interfaceDeclarationSyntax.Identifier.ToString(),
-                mergedStructName = str,
+                scriptName = str,
                 nameSpace = newUsing,
                 usingDirectives = allUsing,
             };
@@ -117,10 +187,10 @@ namespace AbilitySourceGenerator
             allUsing.Add(newUsing);
         }
         
-        private static List<StructData> BuildStructsData(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, ScriptGenerateData scriptGenerateData, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+        private List<StructData> BuildStructsData(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, HeaderData headerData, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
             List<StructData> structDataList = new List<StructData>();
-            foreach (StructDeclarationSyntax allStruct in syntaxReceiver.AllStructs)
+            foreach (StructDeclarationSyntax allStruct in syntaxReceiver.allStructs)
             {
                 StructDeclarationSyntax typeSyntax = allStruct;
                 SyntaxToken identifier1 = interfaceDeclarationSyntax.Identifier;
@@ -128,31 +198,32 @@ namespace AbilitySourceGenerator
                 if (Utils.ImplementsInterface(typeSyntax, text))
                 {
                     SyntaxToken identifier2 = allStruct.Identifier;
-                    if (!identifier2.Text.Equals(scriptGenerateData.mergedStructName))
+                    if (!identifier2.Text.Equals(headerData.scriptName))
                     {
-                        StructData structData = new StructData();
-                        structData.Namespace = Utils.GetNamespace(allStruct);
-                        structData.StructName = allStruct.Identifier.ToString();
-                        foreach (UsingDirectiveSyntax usingDirectiveSyntax in interfaceDeclarationSyntax.SyntaxTree.GetCompilationUnitRoot().Usings)
+                        StructData structData = new StructData
                         {
-                            TryAddUsing(scriptGenerateData.usingDirectives, usingDirectiveSyntax.Name.ToString());
+                            nameSpace = Utils.GetNamespace(allStruct),
+                            structName = allStruct.Identifier.ToString()
+                        };
+                        foreach (var usingDirectiveSyntax in interfaceDeclarationSyntax.SyntaxTree.GetCompilationUnitRoot().Usings)
+                        {
+                            TryAddUsing(headerData.usingDirectives, usingDirectiveSyntax.Name.ToString());
                         }
 
                         SemanticModel semanticModel = context.Compilation.GetSemanticModel(interfaceDeclarationSyntax.SyntaxTree, false);
                         INamedTypeSymbol declaredSymbol = semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax);
 
-                        List<IFieldSymbol> fieldSymbolList = declaredSymbol != null
-                            ? ImmutableArrayExtensions.Where(declaredSymbol.GetMembers(),
-                                it => it.Kind == SymbolKind.Field).Cast<IFieldSymbol>().ToList()
-                            : null;
+                        List<IFieldSymbol> fieldSymbolList = declaredSymbol?.GetMembers().Where(it => it.Kind == SymbolKind.Field).Cast<IFieldSymbol>().ToList();
                         if (fieldSymbolList != null)
                         {
-                            foreach (IFieldSymbol fieldSymbol in fieldSymbolList)
-                                structData.Fields.Add(new StructFieldData()
+                            foreach (var fieldSymbol in fieldSymbolList)
+                            {
+                                structData.fields.Add(new StructFieldData()
                                 {
-                                    TypeName = fieldSymbol.Type.Name,
-                                    FieldName = MapFieldNameToProperty(fieldSymbol)
+                                    typeName = fieldSymbol.Type.Name,
+                                    fieldName = MapFieldNameToProperty(fieldSymbol)
                                 });
+                            }
                         }
 
                         structDataList.Add(structData);
@@ -166,21 +237,20 @@ namespace AbilitySourceGenerator
         private static string MapFieldNameToProperty(IFieldSymbol fieldSymbol) =>
             fieldSymbol.AssociatedSymbol is IPropertySymbol associatedSymbol ? associatedSymbol.Name : fieldSymbol.Name;
         
-        private static List<MergedFieldData> BuildMergedFields(List<StructData> structDataList)
+        private List<MergedFieldData> BuildMergedFields(List<StructData> structDataList)
         {
             List<MergedFieldData> mergedFieldDataList = new List<MergedFieldData>();
             List<int> intList = new List<int>();
-            foreach (StructData structData in structDataList)
+            foreach (var structData in structDataList)
             {
                 intList.Clear();
-                for (int index1 = 0; index1 < structData.Fields.Count; ++index1)
+                foreach (var field in structData.fields)
                 {
-                    StructFieldData field = structData.Fields[index1];
                     int index2 = -1;
                     for (int index3 = 0; index3 < mergedFieldDataList.Count; ++index3)
                     {
                         if (!intList.Contains(index3) &&
-                            string.Equals(field.TypeName, mergedFieldDataList[index3].TypeName))
+                            string.Equals(field.typeName, mergedFieldDataList[index3].typeName))
                         {
                             index2 = index3;
                             break;
@@ -190,19 +260,21 @@ namespace AbilitySourceGenerator
                     if (index2 < 0)
                     {
                         int count = mergedFieldDataList.Count;
-                        MergedFieldData mergedFieldData = new MergedFieldData();
-                        mergedFieldData.TypeName = field.TypeName;
-                        mergedFieldData.FieldName = string.Format("{0}_{1}", field.TypeName, mergedFieldDataList.Count);
-                        mergedFieldData.FieldNameForStructName.Add(structData.StructName, field.FieldName);
+                        MergedFieldData mergedFieldData = new MergedFieldData
+                        {
+                            typeName = field.typeName,
+                            fieldName = $"{field.typeName}_{mergedFieldDataList.Count}"
+                        };
+                        mergedFieldData.fieldNameForStructName.Add(structData.structName, field.fieldName);
                         mergedFieldDataList.Add(mergedFieldData);
-                        field.MergedFieldName = mergedFieldData.FieldName;
+                        field.mergedFieldName = mergedFieldData.fieldName;
                         intList.Add(count);
                     }
                     else
                     {
                         MergedFieldData mergedFieldData = mergedFieldDataList[index2];
-                        mergedFieldData.FieldNameForStructName.Add(structData.StructName, field.FieldName);
-                        field.MergedFieldName = mergedFieldData.FieldName;
+                        mergedFieldData.fieldNameForStructName.Add(structData.structName, field.fieldName);
+                        field.mergedFieldName = mergedFieldData.fieldName;
                         intList.Add(index2);
                     }
                 }
@@ -211,136 +283,142 @@ namespace AbilitySourceGenerator
             return mergedFieldDataList;
         }
         
-        private static SourceText GenerateMergedStruct(ScriptGenerateData scriptGenerateData, List<ISymbol> allMemberSymbols, List<MergedFieldData> mergedFieldData,
+        private SourceText GenerateMergedStruct(HeaderData headerData, List<ISymbol> allMemberSymbols, List<MergedFieldData> mergedFieldData,
             List<StructData> structDataList)
         {
             FileWriter fileWriter = new FileWriter();
-            GenerateUsingDirectives(fileWriter, scriptGenerateData);
+            GenerateUsingDirectives(fileWriter, headerData);
             fileWriter.WriteLine("");
-            int num = !string.IsNullOrEmpty(scriptGenerateData.nameSpace) ? 1 : 0;
+            int num = !string.IsNullOrEmpty(headerData.nameSpace) ? 1 : 0;
             if (num != 0)
             {
-                fileWriter.WriteLine("namespace " + scriptGenerateData.nameSpace);
+                fileWriter.WriteLine($"namespace {headerData.nameSpace}");
                 fileWriter.BeginScope();
             }
 
-            GenerateStructHeader(fileWriter, scriptGenerateData);
+            GenerateStructHeader(fileWriter, headerData);
             fileWriter.BeginScope();
             GenerateTypeEnum(fileWriter, structDataList);
             fileWriter.WriteLine("");
             GenerateFields(fileWriter, mergedFieldData);
             fileWriter.WriteLine("");
-            GenerateMethods(fileWriter, scriptGenerateData, allMemberSymbols, structDataList);
-            fileWriter.WriteLine("");
+            // GenerateMethods(fileWriter, headerData, allMemberSymbols, structDataList);
+            // fileWriter.WriteLine("");
             fileWriter.EndScope();
+            
             if (num != 0)
+            {
                 fileWriter.EndScope();
-            return SourceText.From(fileWriter.FileContents, Encoding.UTF8, SourceHashAlgorithm.Sha1);
+            }
+            return SourceText.From(fileWriter.FileContents, Encoding.UTF8);
         }
         
-        private static void GenerateUsingDirectives(FileWriter mergedStructWriter, ScriptGenerateData scriptGenerateData)
+        private static void GenerateUsingDirectives(FileWriter mergedStructWriter, HeaderData headerData)
         {
-            foreach (string usingDirective in scriptGenerateData.usingDirectives)
+            foreach (string usingDirective in headerData.usingDirectives)
             {
-                mergedStructWriter.WriteLine("using " + usingDirective + ";");
+                mergedStructWriter.WriteLine($"using {usingDirective};");
             }
         }
         
-        private static void GenerateStructHeader(FileWriter structWriter, ScriptGenerateData scriptGenerateData)
+        private void GenerateStructHeader(FileWriter structWriter, HeaderData headerData)
         {
-            structWriter.WriteLine("[Serializable]");
-            structWriter.WriteLine("public partial struct " + scriptGenerateData.mergedStructName + " : " + scriptGenerateData.interfaceName);
+            // structWriter.WriteLine("[Serializable]");
+            structWriter.WriteLine($"public partial struct " + $"{headerData.scriptName} : " + $"{headerData.interfaceName}");
+            // structWriter.WriteLine($"public partial struct {headerData.scriptName}");
         }
         
-        private static void GenerateTypeEnum(FileWriter structWriter, List<StructData> structDataList)
+        private void GenerateTypeEnum(FileWriter structWriter, List<StructData> structDataList)
         {
             structWriter.WriteLine("public enum TypeId");
             structWriter.BeginScope();
-            foreach (StructData structData in structDataList)
+            foreach (var structData in structDataList)
             {
-                structWriter.WriteLine(structData.StructName + ",");
+                structWriter.WriteLine($"{structData.structName},");
             }
             structWriter.EndScope();
         }
         
-        private static void GenerateFields(FileWriter structWriter, List<MergedFieldData> mergedFields)
+        private void GenerateFields(FileWriter structWriter, List<MergedFieldData> mergedFields)
         {
             structWriter.WriteLine("public TypeId CurrentTypeId;");
-            for (int index = 0; index < mergedFields.Count; ++index)
+            foreach (var mergedField in mergedFields)
             {
-                MergedFieldData mergedField = mergedFields[index];
-                structWriter.WriteLine("public " + mergedField.TypeName + " " + mergedField.FieldName + ";");
+                structWriter.WriteLine($"public {mergedField.typeName} {mergedField.fieldName};");
             }
         }
         
-        private static void GenerateMethods(FileWriter structWriter, ScriptGenerateData scriptGenerateData, List<ISymbol> allMemberSymbols, List<StructData> structDataList)
+        private void GenerateMethods(FileWriter structWriter, HeaderData headerData, List<ISymbol> allMemberSymbols, List<StructData> structDataList)
         {
-            foreach (ISymbol allMemberSymbol in allMemberSymbols)
+            if (allMemberSymbols == null || allMemberSymbols.Count == 0)
+            {
+                return;
+            }
+            
+            foreach (var allMemberSymbol in allMemberSymbols)
             {
                 if (allMemberSymbol is IMethodSymbol methodSymbol)
                 {
                     string str1 = methodSymbol.ReturnsVoid
                         ? "void"
-                        : methodSymbol.ReturnType.ToDisplayString(null);
+                        : methodSymbol.ReturnType.ToDisplayString();
                     string str2 = string.Join(", ",
-                        ImmutableArrayExtensions.Select(methodSymbol.Parameters, it => string.Format("{0}{1} {2}", MapRefKind(it.RefKind), it.Type, it.Name)));
+                        methodSymbol.Parameters.Select(it => $"{MapRefKind(it.RefKind)}{it.Type} {it.Name}"));
                     string str3 = string.Join(", ",
-                        ImmutableArrayExtensions.Select(methodSymbol.Parameters, it => MapRefKind(it.RefKind) + it.Name));
-                    structWriter.WriteLine("public " + str1 + " " + methodSymbol.Name + "(" + str2 + ")");
-                    GenerateMethodBody(structWriter, scriptGenerateData, methodSymbol, structDataList,
-                        methodSymbol.Name + "(" + str3 + ")");
+                        methodSymbol.Parameters.Select(it => MapRefKind(it.RefKind) + it.Name));
+                    structWriter.WriteLine($"public {str1} {methodSymbol.Name}({str2})");
+                    GenerateMethodBody(structWriter, headerData, methodSymbol, structDataList, $"{methodSymbol.Name}({str3})");
                 }
                 else if (allMemberSymbol is IPropertySymbol propertySymbol)
                 {
-                    structWriter.WriteLine(string.Format("public {0} {1}", propertySymbol.Type, propertySymbol.Name));
+                    structWriter.WriteLine($"public {propertySymbol.Type} {propertySymbol.Name}");
                     structWriter.BeginScope();
                     if (propertySymbol.GetMethod != null)
-                        GeneratePropertyGetMethod(structWriter, scriptGenerateData, propertySymbol.GetMethod,
+                        GeneratePropertyGetMethod(structWriter, headerData, propertySymbol.GetMethod,
                             structDataList, propertySymbol.Name);
                     if (propertySymbol.SetMethod != null)
-                        GeneratePropertySetMethod(structWriter, scriptGenerateData, propertySymbol.SetMethod,
+                        GeneratePropertySetMethod(structWriter, headerData, propertySymbol.SetMethod,
                             structDataList, propertySymbol.Name);
                     structWriter.EndScope();
                 }
             }
         }
         
-        private static void GeneratePropertyGetMethod(FileWriter structWriter, ScriptGenerateData scriptGenerateData, IMethodSymbol methodSymbol,
+        private static void GeneratePropertyGetMethod(FileWriter structWriter, HeaderData headerData, IMethodSymbol methodSymbol,
             List<StructData> structDataList, string propertyName)
         {
             structWriter.WriteLine("get");
-            GenerateMethodBody(structWriter, scriptGenerateData, methodSymbol, structDataList, propertyName ?? "");
+            GenerateMethodBody(structWriter, headerData, methodSymbol, structDataList, propertyName ?? "");
         }
         
-        private static void GeneratePropertySetMethod(FileWriter structWriter, ScriptGenerateData scriptGenerateData, IMethodSymbol methodSymbol, List<StructData> structDataList,
+        private static void GeneratePropertySetMethod(FileWriter structWriter, HeaderData headerData, IMethodSymbol methodSymbol, List<StructData> structDataList,
             string propertyName)
         {
             structWriter.WriteLine("set");
-            GenerateMethodBody(structWriter, scriptGenerateData, methodSymbol, structDataList, propertyName + " = value");
+            GenerateMethodBody(structWriter, headerData, methodSymbol, structDataList,  $"{propertyName} = value");
         }
         
-        private static void GenerateMethodBody(FileWriter structWriter, ScriptGenerateData scriptGenerateData, IMethodSymbol methodSymbol, List<StructData> structDataList, string callClause)
+        private static void GenerateMethodBody(FileWriter structWriter, HeaderData headerData, IMethodSymbol methodSymbol, List<StructData> structDataList, string callClause)
         {
             structWriter.BeginScope();
             structWriter.WriteLine("switch(CurrentTypeId)");
             structWriter.BeginScope();
             bool returnsVoid = methodSymbol.ReturnsVoid;
-            foreach (StructData structData in structDataList)
+            foreach (var structData in structDataList)
             {
-                structWriter.WriteLine("case TypeId." + structData.StructName + ":");
+                structWriter.WriteLine($"case TypeId.{structData.structName}:");
                 structWriter.BeginScope();
-                string str = "instance_" + structData.StructName;
-                structWriter.WriteLine(
-                    structData.StructName + " " + str + " = new " + structData.StructName + "(this);");
-                structWriter.WriteLine((returnsVoid ? "" : "var r = ") + str + "." + callClause + ";");
-                structWriter.WriteLine(str + ".To" + scriptGenerateData.mergedStructName + "(ref this);");
+                string str = $"instance_{structData.structName}";
+                structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}(this);");
+                structWriter.WriteLine((returnsVoid ? "" : "var r = ") + $"{str}.{callClause};");
+                structWriter.WriteLine($"{str}.To{headerData.scriptName}(ref this);");
                 structWriter.WriteLine(returnsVoid ? "break;" : "return r;");
                 structWriter.EndScope();
             }
 
             structWriter.WriteLine("default:");
             structWriter.BeginScope();
-            foreach (IParameterSymbol parameter in methodSymbol.Parameters)
+            foreach (var parameter in methodSymbol.Parameters)
             {
                 if (parameter.RefKind == RefKind.Out)
                 {
@@ -356,110 +434,76 @@ namespace AbilitySourceGenerator
 
         private static string MapRefKind(RefKind argRefKind)
         {
-            switch (argRefKind)
+            return argRefKind switch
             {
-                case RefKind.None:
-                    return "";
-                case RefKind.Ref:
-                    return "ref ";
-                case RefKind.Out:
-                    return "out ";
-                case RefKind.In:
-                    return "in ";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(argRefKind), (object)argRefKind, (string)null);
-            }
+                RefKind.None => "",
+                RefKind.Ref => "ref ",
+                RefKind.Out => "out ",
+                RefKind.In => "in ",
+                _ => throw new ArgumentOutOfRangeException(nameof(argRefKind), argRefKind, null)
+            };
         }
         
         private static void GeneratePartialStruct(GeneratorExecutionContext context, List<string> allUsings, string mergedStructName,
             StructData structData, List<MergedFieldData> mergedFields)
         {
             FileWriter fileWriter = new FileWriter();
-            foreach (string allUsing in allUsings)
+            foreach (var allUsing in allUsings)
             {
-                fileWriter.WriteLine("using " + allUsing + ";");
+                fileWriter.WriteLine($"using {allUsing};");
             }
             fileWriter.WriteLine("");
-            if (!string.IsNullOrEmpty(structData.Namespace))
+            if (!string.IsNullOrEmpty(structData.nameSpace))
             {
-                fileWriter.WriteLine("namespace " + structData.Namespace);
+                fileWriter.WriteLine($"namespace {structData.nameSpace}");
                 fileWriter.BeginScope();
             }
 
-            fileWriter.WriteLine("public partial struct " + structData.StructName);
+            fileWriter.WriteLine($"public partial struct {structData.structName}");
             fileWriter.BeginScope();
-            fileWriter.WriteLine("public " + structData.StructName + "(" + mergedStructName + " s)");
+            fileWriter.WriteLine($"public {structData.structName}({mergedStructName} s)");
             fileWriter.BeginScope();
-            foreach (StructFieldData field in structData.Fields)
+            foreach (var field in structData.fields)
             {
-                fileWriter.WriteLine(field.FieldName + " = s." + field.MergedFieldName + ";");
+                fileWriter.WriteLine($"{field.fieldName} = s.{field.mergedFieldName};");
             }
             fileWriter.EndScope();
             fileWriter.WriteLine("");
-            fileWriter.WriteLine("public " + mergedStructName + " To" + mergedStructName + "()");
+            fileWriter.WriteLine($"public {mergedStructName} To{mergedStructName}()");
             fileWriter.BeginScope();
-            fileWriter.WriteLine("return new " + mergedStructName);
+            fileWriter.WriteLine($"return new {mergedStructName}");
             fileWriter.BeginScope();
-            fileWriter.WriteLine("CurrentTypeId = " + mergedStructName + ".TypeId." + structData.StructName + ",");
-            foreach (MergedFieldData mergedField in mergedFields)
+            fileWriter.WriteLine($"CurrentTypeId = {mergedStructName}.TypeId.{structData.structName},");
+            foreach (var mergedField in mergedFields)
             {
-                if (mergedField.FieldNameForStructName.ContainsKey(structData.StructName))
+                if (mergedField.fieldNameForStructName.ContainsKey(structData.structName))
                 {
-                    fileWriter.WriteLine(mergedField.FieldName + " = " + mergedField.FieldNameForStructName[structData.StructName] + ",");
+                    fileWriter.WriteLine($"{mergedField.fieldName} = {mergedField.fieldNameForStructName[structData.structName]},");
                 }
             }
             
             fileWriter.EndScope(";");
             fileWriter.EndScope();
             fileWriter.WriteLine("");
-            fileWriter.WriteLine("public void To" + mergedStructName + "(ref " + mergedStructName + " s)");
+            fileWriter.WriteLine($"public void To{mergedStructName}(ref {mergedStructName} s)");
             fileWriter.BeginScope();
-            fileWriter.WriteLine("s.CurrentTypeId = " + mergedStructName + ".TypeId." + structData.StructName + ";");
-            foreach (MergedFieldData mergedField in mergedFields)
+            fileWriter.WriteLine($"s.CurrentTypeId = {mergedStructName}.TypeId.{structData.structName};");
+            foreach (var mergedField in mergedFields)
             {
-                if (mergedField.FieldNameForStructName.ContainsKey(structData.StructName))
+                if (mergedField.fieldNameForStructName.ContainsKey(structData.structName))
                 {
-                    fileWriter.WriteLine("s." + mergedField.FieldName + " = " + mergedField.FieldNameForStructName[structData.StructName] + ";");
+                    fileWriter.WriteLine($"s.{mergedField.fieldName} = {mergedField.fieldNameForStructName[structData.structName]};");
                 }
             }
 
             fileWriter.EndScope();
             fileWriter.EndScope();
-            if (!string.IsNullOrEmpty(structData.Namespace))
+            if (!string.IsNullOrEmpty(structData.nameSpace))
             {
                 fileWriter.EndScope();
             }
             
-            context.AddSource(structData.StructName, SourceText.From(fileWriter.FileContents, Encoding.UTF8, SourceHashAlgorithm.Sha1));
-        }
-        
-        public class ScriptGenerateData
-        {
-            public string mergedStructName;
-            public string interfaceName;
-            public string nameSpace;
-            public List<string> usingDirectives;
-        }
-
-        public class StructData
-        {
-            public string Namespace = "";
-            public string StructName = "";
-            public List<StructFieldData> Fields = new List<StructFieldData>();
-        }
-
-        public class StructFieldData
-        {
-            public string TypeName = "";
-            public string FieldName = "";
-            public string MergedFieldName = "";
-        }
-
-        public class MergedFieldData
-        {
-            public string TypeName = "";
-            public string FieldName = "";
-            public Dictionary<string, string> FieldNameForStructName = new Dictionary<string, string>();
+            context.AddSource(structData.structName, SourceText.From(fileWriter.FileContents, Encoding.UTF8));
         }
     }
 }

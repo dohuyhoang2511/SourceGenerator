@@ -3921,11 +3921,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Archmage\\TowerAscension\\CreateSourceGeneratorDLL\\ExampleSourceGenerator\\ExampleSourceGenerator.csproj",
+      "projectUniqueName": "D:\\Archmage\\SourceGenerator\\CreateSourceGeneratorDLL\\ExampleSourceGenerator\\ExampleSourceGenerator.csproj",
       "projectName": "ExampleSourceGenerator",
-      "projectPath": "D:\\Archmage\\TowerAscension\\CreateSourceGeneratorDLL\\ExampleSourceGenerator\\ExampleSourceGenerator.csproj",
+      "projectPath": "D:\\Archmage\\SourceGenerator\\CreateSourceGeneratorDLL\\ExampleSourceGenerator\\ExampleSourceGenerator.csproj",
       "packagesPath": "C:\\Users\\Huy Hoang\\.nuget\\packages\\",
-      "outputPath": "D:\\Archmage\\TowerAscension\\CreateSourceGeneratorDLL\\ExampleSourceGenerator\\obj\\",
+      "outputPath": "D:\\Archmage\\SourceGenerator\\CreateSourceGeneratorDLL\\ExampleSourceGenerator\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Huy Hoang\\AppData\\Roaming\\NuGet\\NuGet.Config"

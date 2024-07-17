@@ -19,3 +19,11 @@ D:\Archmage\TowerAscension\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\D
 D:\Archmage\TowerAscension\CreateSourceGeneratorDLL\ExampleSourceGenerator\bin\Debug\netstandard2.0\ExampleSourceGenerator.deps.json
 D:\Archmage\TowerAscension\CreateSourceGeneratorDLL\ExampleSourceGenerator\bin\Debug\netstandard2.0\ExampleSourceGenerator.dll
 D:\Archmage\TowerAscension\CreateSourceGeneratorDLL\ExampleSourceGenerator\bin\Debug\netstandard2.0\ExampleSourceGenerator.pdb
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.csproj.AssemblyReference.cache
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.GeneratedMSBuildEditorConfig.editorconfig
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.AssemblyInfoInputs.cache
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.AssemblyInfo.cs
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.csproj.CoreCompileInputs.cache
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.sourcelink.json
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.dll
+D:\Archmage\SourceGenerator\CreateSourceGeneratorDLL\ExampleSourceGenerator\obj\Debug\netstandard2.0\ExampleSourceGenerator.pdb

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "sXowANV/cRQ=",
+  "dgSpecHash": "JtNeM8InGOI=",
   "success": true,
-  "projectFilePath": "D:\\Archmage\\TowerAscension\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj",
+  "projectFilePath": "D:\\Archmage\\SourceGenerator\\CreateAbilitySourceGeneratorDLL\\AbilitySourceGenerator\\AbilitySourceGenerator.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\humanizer.core\\2.2.0\\humanizer.core.2.2.0.nupkg.sha512",
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\1.1.1\\microsoft.bcl.asyncinterfaces.1.1.1.nupkg.sha512",
@@ -16,7 +16,7 @@
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\microsoft.codeanalysis.workspaces.common\\3.8.0\\microsoft.codeanalysis.workspaces.common.3.8.0.nupkg.sha512",
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\microsoft.netcore.targets\\1.1.0\\microsoft.netcore.targets.1.1.0.nupkg.sha512",
-    "C:\\Users\\Huy Hoang\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512",
+    "C:\\Users\\Huy Hoang\\.nuget\\packages\\netstandard.library\\2.0.0\\netstandard.library.2.0.0.nupkg.sha512",
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\system.buffers\\4.5.1\\system.buffers.4.5.1.nupkg.sha512",
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\system.collections\\4.3.0\\system.collections.4.3.0.nupkg.sha512",
     "C:\\Users\\Huy Hoang\\.nuget\\packages\\system.collections.immutable\\5.0.0\\system.collections.immutable.5.0.0.nupkg.sha512",
