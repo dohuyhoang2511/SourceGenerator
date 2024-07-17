@@ -1,0 +1,5 @@
+is_global = true
+build_property.RootNamespace = CreateSourceGeneratorDLL
+build_property.ProjectDir = D:\Archmage\CreateSourceGeneratorDLL\CreateSourceGeneratorDLL\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
