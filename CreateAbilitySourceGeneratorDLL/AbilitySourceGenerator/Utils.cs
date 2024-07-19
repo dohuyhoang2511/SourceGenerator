@@ -50,7 +50,7 @@ namespace AbilitySourceGenerator
 
             if (declaredSymbol == null)
             {
-                return null;
+                return new List<ISymbol>();
             }
 
             return declaredSymbol.GetMembers().Concat(declaredSymbol.AllInterfaces.SelectMany(it => it.GetMembers())).Where(IsNotAPropertyMethod).ToList();
@@ -67,7 +67,7 @@ namespace AbilitySourceGenerator
         {
             if (typeSyntax.BaseList != null)
             {
-                foreach (object type in typeSyntax.BaseList.Types)
+                foreach (var type in typeSyntax.BaseList.Types)
                 {
                     if (type.ToString() == interfaceName)
                         return true;

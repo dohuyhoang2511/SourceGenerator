@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AbilitySourceGenerator")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a50946912f099b0002ef0191e4aefe4c57801de0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3609e83d4828d3e478e52a56e363b5e40a7508e7")]
 [assembly: System.Reflection.AssemblyProductAttribute("AbilitySourceGenerator")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AbilitySourceGenerator")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -159,20 +159,20 @@ namespace AbilitySourceGenerator
         private List<StructData> BuildStructsData(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, HeaderData headerData, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
             List<StructData> structDataList = new List<StructData>();
-            foreach (StructDeclarationSyntax allStruct in syntaxReceiver.allStructs)
+            foreach (StructDeclarationSyntax structDeclarationSyntax in syntaxReceiver.polymorphicStructs)
             {
-                StructDeclarationSyntax typeSyntax = allStruct;
+                StructDeclarationSyntax typeSyntax = structDeclarationSyntax;
                 SyntaxToken identifier1 = interfaceDeclarationSyntax.Identifier;
-                string text = identifier1.Text;
-                if (Utils.ImplementsInterface(typeSyntax, text))
+                string interfaceName = identifier1.Text;
+                if (Utils.ImplementsInterface(typeSyntax, interfaceName))
                 {
-                    SyntaxToken identifier2 = allStruct.Identifier;
+                    SyntaxToken identifier2 = structDeclarationSyntax.Identifier;
                     if (!identifier2.Text.Equals(headerData.scriptName))
                     {
                         StructData structData = new StructData
                         {
-                            nameSpace = Utils.GetNamespace(allStruct),
-                            structName = allStruct.Identifier.ToString()
+                            nameSpace = Utils.GetNamespace(structDeclarationSyntax),
+                            structName = structDeclarationSyntax.Identifier.ToString()
                         };
                         foreach (var usingDirectiveSyntax in interfaceDeclarationSyntax.SyntaxTree.GetCompilationUnitRoot().Usings)
                         {
@@ -374,9 +374,9 @@ namespace AbilitySourceGenerator
             {
                 structWriter.WriteLine($"case UnitAbilityPolymorphismType.{structData.structName}:");
                 structWriter.BeginScope();
-                // string str = $"instance_{structData.structName}";
-                // structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}(this);");
-                // structWriter.WriteLine((returnsVoid ? "" : "var r = ") + $"{str}.{callClause};");
+                string str = $"instance_{structData.structName}";
+                structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}();");
+                structWriter.WriteLine((returnsVoid ? "" : "var r = ") + $"{str}.{callClause};");
                 // structWriter.WriteLine($"{str}.To{headerData.scriptName}(ref this);");
                 structWriter.WriteLine(returnsVoid ? "break;" : "return r;");
                 structWriter.EndScope();
