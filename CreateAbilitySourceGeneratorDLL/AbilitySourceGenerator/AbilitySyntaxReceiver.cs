@@ -17,7 +17,7 @@ namespace AbilitySourceGenerator
             switch (syntaxNode)
             {
                 case InterfaceDeclarationSyntax interfaceStatementSyntax:
-                    if (!Utils.HasAttribute(interfaceStatementSyntax, "AbilityGeneratePolymorphismInterface"))
+                    if (!Utils.HasAttribute(interfaceStatementSyntax, "AbilityGeneratePolymorphismComponent"))
                     {
                         break;
                     }

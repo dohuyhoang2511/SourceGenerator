@@ -83,7 +83,7 @@ namespace AbilitySourceGenerator
 
             foreach (var interfaceDeclarationSyntax in syntaxReceiver.polymorphicInterfaces)
             {
-                GenerateStructFromInterface(context, syntaxReceiver, interfaceDeclarationSyntax);
+                GenerateStructComponentFromInterface(context, syntaxReceiver, interfaceDeclarationSyntax);
             }
         }
 
@@ -94,7 +94,7 @@ namespace AbilitySourceGenerator
             context.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, DiagnosticSeverity.Error));
         }
         
-        private void GenerateStructFromInterface(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+        private void GenerateStructComponentFromInterface(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
             HeaderData headerData = GetHeader(interfaceDeclarationSyntax);
             List<ISymbol> allMemberSymbols = Utils.GetAllMemberSymbols(context, interfaceDeclarationSyntax);
@@ -116,8 +116,6 @@ namespace AbilitySourceGenerator
             // {
             //     GeneratePartialStruct(context, headerData.usingDirectives, headerData.scriptName, structData, mergedFieldData);  
             // }
-        
-            return;
         }
 
         private static HeaderData GetHeader(InterfaceDeclarationSyntax interfaceDeclarationSyntax)
@@ -375,7 +373,7 @@ namespace AbilitySourceGenerator
                 structWriter.WriteLine($"case UnitAbilityPolymorphismType.{structData.structName}:");
                 structWriter.BeginScope();
                 string str = $"instance_{structData.structName}";
-                structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}();");
+                structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}(this);");
                 structWriter.WriteLine((returnsVoid ? "" : "var r = ") + $"{str}.{callClause};");
                 // structWriter.WriteLine($"{str}.To{headerData.scriptName}(ref this);");
                 structWriter.WriteLine(returnsVoid ? "break;" : "return r;");
