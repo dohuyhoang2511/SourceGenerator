@@ -291,7 +291,7 @@ namespace AbilitySourceGenerator
         private void GenerateStructHeader(FileWriter structWriter, HeaderData headerData)
         {
             structWriter.WriteLine("[Serializable]");
-            structWriter.WriteLine($"public partial struct {headerData.scriptName} : {headerData.interfaceName}");
+            structWriter.WriteLine($"public unsafe partial struct {headerData.scriptName} : {headerData.interfaceName}");
         }
         
         private void GenerateTypeEnum(FileWriter structWriter, List<StructData> structDataList)
@@ -372,10 +372,13 @@ namespace AbilitySourceGenerator
             {
                 structWriter.WriteLine($"case UnitAbilityPolymorphismType.{structData.structName}:");
                 structWriter.BeginScope();
+                structWriter.WriteLine($"fixed({headerData.scriptName}* ptr = &this)");
+                structWriter.BeginScope();
                 string str = $"instance_{structData.structName}";
-                structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}(this);");
+                structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}(ptr);");
                 structWriter.WriteLine((returnsVoid ? "" : "var r = ") + $"{str}.{callClause};");
                 // structWriter.WriteLine($"{str}.To{headerData.scriptName}(ref this);");
+                structWriter.EndScope();
                 structWriter.WriteLine(returnsVoid ? "break;" : "return r;");
                 structWriter.EndScope();
             }
