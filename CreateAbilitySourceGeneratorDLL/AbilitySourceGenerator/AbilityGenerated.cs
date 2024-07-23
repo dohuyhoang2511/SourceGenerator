@@ -197,7 +197,7 @@ namespace AbilitySourceGenerator
                 if (structFieldData.fieldSymbol != null)
                 {
                     fileWriter.WriteLine($"// TypeKind: {structFieldData.fieldSymbol.Type.TypeKind}");
-                    var nameParameter = GetNameField(structFieldData.fieldSymbol, structFieldData.typeName, numberParameter, indexInParameter);
+                    var nameParameter = GetFieldName(structFieldData.fieldSymbol, structFieldData.typeName, numberParameter, indexInParameter);
                     
                     fileWriter.WriteLine($"public {structFieldData.typeName} {structFieldData.fieldName}");
                     fileWriter.BeginScope();
@@ -283,7 +283,7 @@ namespace AbilitySourceGenerator
 
                 if (structFieldData.fieldSymbol != null)
                 {
-                    var nameParameter = GetNameField(structFieldData.fieldSymbol, structFieldData.typeName, numberParameter, indexInParameter);
+                    var nameParameter = GetFieldName(structFieldData.fieldSymbol, structFieldData.typeName, numberParameter, indexInParameter);
                     if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
                     {
                         fileWriter.WriteLine($"data.{nameParameter} = (int){structFieldData.fieldName};");
@@ -333,7 +333,7 @@ namespace AbilitySourceGenerator
             return result;
         }
         
-        private string GetNameField(IFieldSymbol fieldSymbol, string typeName, int numberParameter, int indexInParameter)
+        private string GetFieldName(IFieldSymbol fieldSymbol, string typeName, int numberParameter, int indexInParameter)
         {
             string nameParameter = "";
             if (fieldSymbol.Type.TypeKind == TypeKind.Enum)
