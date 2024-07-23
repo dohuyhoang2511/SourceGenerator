@@ -8,6 +8,7 @@ namespace AbilitySourceGenerator
     {
         public List<InterfaceDeclarationSyntax> polymorphicInterfaces = new List<InterfaceDeclarationSyntax>();
         public List<StructDeclarationSyntax> polymorphicStructs = new List<StructDeclarationSyntax>();
+        public Dictionary<string, StructDeclarationSyntax> initializeDataStructs = new Dictionary<string, StructDeclarationSyntax>();
 
         /// <summary>
         /// Called for every syntax node in the compilation, we can inspect the nodes and save any information useful for generation
@@ -17,18 +18,22 @@ namespace AbilitySourceGenerator
             switch (syntaxNode)
             {
                 case InterfaceDeclarationSyntax interfaceStatementSyntax:
-                    if (!Utils.HasAttribute(interfaceStatementSyntax, "AbilityGeneratePolymorphismComponent"))
+                    if (!Utils.HasAttribute(interfaceStatementSyntax, "AbilityGenerateComponent"))
                     {
                         break;
                     }
                     polymorphicInterfaces.Add(interfaceStatementSyntax);
                     break;
                 case StructDeclarationSyntax structDeclarationSyntax:
-                    if (!Utils.HasAttribute(structDeclarationSyntax, "AbilityGeneratePolymorphismStruct"))
+                    if (Utils.HasAttribute(structDeclarationSyntax, "AbilityGenerateStruct"))
                     {
-                        break;
+                        polymorphicStructs.Add(structDeclarationSyntax);
                     }
-                    polymorphicStructs.Add(structDeclarationSyntax);
+                    else if (Utils.HasAttribute(structDeclarationSyntax, "AbilityGenerateInitializeData", out var argumentString))
+                    {
+                        argumentString = argumentString.Replace("\"", "");
+                        initializeDataStructs.Add(argumentString, structDeclarationSyntax);
+                    }
                     break;
                 default:
                     break;

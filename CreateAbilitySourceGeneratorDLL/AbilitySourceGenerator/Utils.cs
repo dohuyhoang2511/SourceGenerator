@@ -13,7 +13,40 @@ namespace AbilitySourceGenerator
                 foreach (var attribute in attributeList.Attributes)
                 {
                     if (attribute.Name.ToString() == attributeName)
+                    {
                         return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+        
+        /// <summary>
+        /// Check if have attribute and out last argument's name of attribute
+        /// </summary>
+        /// <param name="typeSyntax"></param>
+        /// <param name="attributeName"></param>
+        /// <param name="argumentString"></param>
+        /// <returns></returns>
+        public static bool HasAttribute(BaseTypeDeclarationSyntax typeSyntax, string attributeName, out string argumentString)
+        {
+            argumentString = "";
+            foreach (var attributeList in typeSyntax.AttributeLists)
+            {
+                foreach (var attribute in attributeList.Attributes)
+                {
+                    if (attribute.Name.ToString() == attributeName)
+                    {
+                        if (attribute.ArgumentList != null)
+                        {
+                            foreach (var attributeArgumentSyntax in attribute.ArgumentList.Arguments)
+                            {
+                                argumentString = attributeArgumentSyntax.ToString();
+                            }
+                        }
+                        return true;
+                    }
                 }
             }
 
@@ -56,9 +89,9 @@ namespace AbilitySourceGenerator
             return declaredSymbol.GetMembers().Concat(declaredSymbol.AllInterfaces.SelectMany(it => it.GetMembers())).Where(IsNotAPropertyMethod).ToList();
         }
         
-        private static bool IsNotAPropertyMethod(ISymbol it)
+        private static bool IsNotAPropertyMethod(ISymbol symbol)
         {
-            if (it is not IMethodSymbol methodSymbol)
+            if (symbol is not IMethodSymbol methodSymbol)
                 return true;
             return methodSymbol.MethodKind != MethodKind.PropertyGet && methodSymbol.MethodKind != MethodKind.PropertySet;
         }
