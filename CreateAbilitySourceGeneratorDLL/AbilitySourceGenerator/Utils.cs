@@ -27,7 +27,7 @@ namespace AbilitySourceGenerator
         /// </summary>
         /// <param name="typeSyntax"></param>
         /// <param name="attributeName"></param>
-        /// <param name="argumentString"></param>
+        /// <param name="argumentString">Component's name to generate</param>
         /// <returns></returns>
         public static bool HasAttribute(BaseTypeDeclarationSyntax typeSyntax, string attributeName, out string argumentString)
         {

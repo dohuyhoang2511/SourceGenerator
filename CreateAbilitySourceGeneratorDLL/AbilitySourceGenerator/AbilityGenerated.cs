@@ -20,7 +20,8 @@ namespace AbilitySourceGenerator
     {
         public string nameSpace = "";
         public string structName = "";
-        public List<StructFieldData> fields = new List<StructFieldData>();
+        public Dictionary<string, List<StructFieldData>> fieldsByTypeNameDict =
+            new Dictionary<string, List<StructFieldData>>();
     }
 
     public class StructFieldData
@@ -28,18 +29,18 @@ namespace AbilitySourceGenerator
         public IFieldSymbol? fieldSymbol;
         public string typeName = "";
         public string fieldName = "";
-        public string mergedFieldName = "";
     }
 
     public class MergedFieldData
     {
         public string typeName = "";
         public string fieldName = "";
-        public Dictionary<string, string> fieldNameForStructName = new Dictionary<string, string>();
     }
 
     [Generator]
+#pragma warning disable RS1036
     public class AbilityGenerated : ISourceGenerator
+#pragma warning restore RS1036
     {
 #nullable disable
         // private const string typeEnumName = "UnitAbilityPolymorphismType";
@@ -81,12 +82,16 @@ namespace AbilitySourceGenerator
             {
                 foreach (var pair in syntaxReceiver.initializeDataStructs)
                 {
-                    var structDeclarationSyntax = pair.Value;
-                    string targetStructPointer = pair.Key;
-                    List<StructFieldData> allFields = GetAllFields(context, structDeclarationSyntax);
+                    string targetStructPointerName = pair.Key;
+                    List<StructDeclarationSyntax> structDeclarationSyntaxList = pair.Value;
 
-                    GenerateStructPolymorphismFromInitializeData(context, targetStructPointer, structDeclarationSyntax, allFields);
-                    GenerateStructInitializeData(context, targetStructPointer, structDeclarationSyntax, allFields);
+                    foreach (var structDeclarationSyntax in structDeclarationSyntaxList)
+                    {
+                        List<StructFieldData> allFields = GetAllFieldsOfStruct(context, structDeclarationSyntax);
+
+                        GenerateStructPolymorphismFromInitializeData(context, targetStructPointerName, structDeclarationSyntax, allFields);
+                        GenerateStructInitializeData(context, targetStructPointerName, structDeclarationSyntax, allFields);
+                    }
                 }
             }
             
@@ -112,7 +117,7 @@ namespace AbilitySourceGenerator
             context.AddSource(scriptName, sourceText);
         }
 
-        private List<StructFieldData> GetAllFields(GeneratorExecutionContext context, StructDeclarationSyntax structDeclarationSyntax)
+        private List<StructFieldData> GetAllFieldsOfStruct(GeneratorExecutionContext context, StructDeclarationSyntax structDeclarationSyntax)
         {
             List<StructFieldData> result = new List<StructFieldData>();
             
@@ -121,7 +126,7 @@ namespace AbilitySourceGenerator
 
             List<IFieldSymbol> fieldSymbolList = namedTypeSymbol?.GetMembers().Where(symbol => symbol.Kind == SymbolKind.Field).Cast<IFieldSymbol>().ToList();
 
-            if (fieldSymbolList != null && fieldSymbolList.Count > 0)
+            if (fieldSymbolList != null)
             {
                 foreach (var fieldSymbol in fieldSymbolList)
                 {
@@ -188,45 +193,87 @@ namespace AbilitySourceGenerator
                 return;
             }
 
-            for (int idx = 0; idx < allFields.Count; idx++)
+            var mergedFields = BuildMergedFieldsFromStructInitialized(allFields);
+            if (mergedFields.Count > 0)
             {
-                var structFieldData = allFields[idx];
-                int numberParameter = idx / 4;
-                int indexInParameter = idx % 4;
-
-                if (structFieldData.fieldSymbol != null)
+                foreach (var mergedFieldPairData in mergedFields)
                 {
-                    fileWriter.WriteLine($"// TypeKind: {structFieldData.fieldSymbol.Type.TypeKind}");
-                    var nameParameter = GetFieldName(structFieldData.fieldSymbol, structFieldData.typeName, numberParameter, indexInParameter);
+                    var fieldTypeName = mergedFieldPairData.Key;
+                    var structFieldDataList = mergedFieldPairData.Value;
                     
-                    fileWriter.WriteLine($"public {structFieldData.typeName} {structFieldData.fieldName}");
-                    fileWriter.BeginScope();
+                    for (int idx = 0; idx < structFieldDataList.Count; idx++)
+                    {
+                        var structFieldData = structFieldDataList[idx];
+                        int numberParameter = idx / 4;
+                        int indexInParameter = idx % 4;
+
+                        if (structFieldData.fieldSymbol != null)
+                        {
+                            // fileWriter.WriteLine($"// TypeKind: {structFieldData.fieldSymbol.Type.TypeKind}");
+                            var fieldName = GetFieldNameByRule(structFieldData.fieldSymbol, fieldTypeName, numberParameter, indexInParameter);
                     
-                    if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
-                    {
-                        fileWriter.WriteLine($"get => ({structFieldData.typeName}){structPointerFieldName}->{nameParameter};");
-                        fileWriter.WriteLine($"set => {structPointerFieldName}->{nameParameter} = (int)value;");
-                    }
-                    else if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Struct)
-                    {
-                        fileWriter.WriteLine($"get => {structPointerFieldName}->{nameParameter};");
-                        fileWriter.WriteLine($"set => {structPointerFieldName}->{nameParameter} = value;");
-                    }
-                    else
-                    {
-                        fileWriter.WriteLine($"// Missing unknown field type: {structFieldData.typeName} - {structFieldData.fieldName}");
-                        fileWriter.WriteLine("");
-                    }
+                            fileWriter.WriteLine($"public {structFieldData.typeName} {structFieldData.fieldName}");
+                            fileWriter.BeginScope();
                     
-                    fileWriter.EndScope();
-                    fileWriter.WriteLine("");
+                            if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
+                            {
+                                fileWriter.WriteLine($"get => ({structFieldData.typeName}){structPointerFieldName}->{fieldName};");
+                                fileWriter.WriteLine($"set => {structPointerFieldName}->{fieldName} = ({ParseToIntType()})value;");
+                            }
+                            else if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Struct)
+                            {
+                                fileWriter.WriteLine($"get => {structPointerFieldName}->{fieldName};");
+                                fileWriter.WriteLine($"set => {structPointerFieldName}->{fieldName} = value;");
+                            }
+                            else
+                            {
+                                fileWriter.WriteLine($"// Missing unknown field type: {structFieldData.typeName} - {structFieldData.fieldName}");
+                                fileWriter.WriteLine("");
+                            }
+                    
+                            fileWriter.EndScope();
+                            fileWriter.WriteLine("");
+                        }
+                    }
                 }
             }
         }
         
+        private Dictionary<string, List<StructFieldData>> BuildMergedFieldsFromStructInitialized(List<StructFieldData> allFields)
+        {
+            Dictionary<string, List<StructFieldData>> result = new Dictionary<string, List<StructFieldData>>();
+
+            foreach (var structFieldData in allFields)
+            {
+                if (structFieldData.fieldSymbol == null)
+                {
+                    continue;
+                }
+
+                string typeName = "typeName_Null";
+                if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
+                {
+                    typeName = "Int32";
+                }
+                else if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Struct)
+                {
+                    typeName = structFieldData.typeName;
+                }
+                
+                if (!result.ContainsKey(typeName))
+                {
+                    result.Add(typeName, new List<StructFieldData>());
+                }
+                    
+                result[typeName].Add(structFieldData);
+            }
+
+            return result;
+        }
+        
         #endregion
 
-        #region Generate Sync Data From Initialize Data
+        #region Generate Initialize Data From Initialize Data
         
         private void GenerateStructInitializeData(GeneratorExecutionContext context, string targetStructPointer, StructDeclarationSyntax structDeclarationSyntax, List<StructFieldData> allFields)
         {
@@ -275,22 +322,32 @@ namespace AbilitySourceGenerator
             
             fileWriter.WriteLine($"var data = new {targetStructPointer}();");
 
-            for (int idx = 0; idx < allFields.Count; idx++)
+            var mergedFields = BuildMergedFieldsFromStructInitialized(allFields);
+            if (mergedFields.Count > 0)
             {
-                var structFieldData = allFields[idx];
-                int numberParameter = idx / 4;
-                int indexInParameter = idx % 4;
-
-                if (structFieldData.fieldSymbol != null)
+                foreach (var mergedFieldPairData in mergedFields)
                 {
-                    var nameParameter = GetFieldName(structFieldData.fieldSymbol, structFieldData.typeName, numberParameter, indexInParameter);
-                    if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
+                    var fieldTypeName = mergedFieldPairData.Key;
+                    var structFieldDataList = mergedFieldPairData.Value;
+
+                    for (int idx = 0; idx < structFieldDataList.Count; idx++)
                     {
-                        fileWriter.WriteLine($"data.{nameParameter} = (int){structFieldData.fieldName};");
-                    }
-                    else if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Struct)
-                    {
-                        fileWriter.WriteLine($"data.{nameParameter} = {structFieldData.fieldName};");
+                        var structFieldData = structFieldDataList[idx];
+                        int numberParameter = idx / 4;
+                        int indexInParameter = idx % 4;
+                        
+                        if (structFieldData.fieldSymbol != null)
+                        {
+                            var fieldName = GetFieldNameByRule(structFieldData.fieldSymbol, fieldTypeName, numberParameter, indexInParameter);
+                            if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
+                            {
+                                fileWriter.WriteLine($"data.{fieldName} = ({ParseToIntType()}){structFieldData.fieldName};");
+                            }
+                            else if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Struct)
+                            {
+                                fileWriter.WriteLine($"data.{fieldName} = {structFieldData.fieldName};");
+                            }
+                        }
                     }
                 }
             }
@@ -301,54 +358,29 @@ namespace AbilitySourceGenerator
         
         #endregion
 
-        private Dictionary<string, List<string>> BuildMergedNameFields(List<StructFieldData> allFields)
+        private string ParseToIntType()
         {
-            Dictionary<string, List<string>> result = new Dictionary<string, List<string>>();
-
-            foreach (var structFieldData in allFields)
-            {
-                if (structFieldData.fieldSymbol == null)
-                {
-                    continue;
-                }
-
-                string typeName = "typeName_Null";
-                if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Enum)
-                {
-                    typeName = "int32";
-                }
-                else if (structFieldData.fieldSymbol.Type.TypeKind == TypeKind.Struct)
-                {
-                    typeName = structFieldData.typeName;
-                }
-                
-                if (!result.ContainsKey(typeName))
-                {
-                    result.Add(typeName, new List<string>());
-                }
-                    
-                result[typeName].Add(structFieldData.fieldName);
-            }
-
-            return result;
+            return "int";
         }
         
-        private string GetFieldName(IFieldSymbol fieldSymbol, string typeName, int numberParameter, int indexInParameter)
+        private string GetFieldNameByRule(IFieldSymbol fieldSymbol, string typeName, int fieldNumber, int indexInField)
         {
-            string nameParameter = "";
+            string fieldName = "";
             if (fieldSymbol.Type.TypeKind == TypeKind.Enum)
             {
-                nameParameter = "int32";
-                return $"{nameParameter}Parameter_{numberParameter}[{indexInParameter}]";
+                fieldName = "int32";
+                return $"{fieldName}Parameter_{fieldNumber}[{indexInField}]";
             }
             else if (fieldSymbol.Type.TypeKind == TypeKind.Struct)
             {
-                nameParameter = $"{typeName.Substring(0, 1).ToLower()}{typeName.Substring(1)}";
-                return $"{nameParameter}Parameter_{numberParameter}[{indexInParameter}]";
+                fieldName = $"{typeName.Substring(0, 1).ToLower()}{typeName.Substring(1)}";
+                return $"{fieldName}Parameter_{fieldNumber}[{indexInField}]";
             }
 
             return "Get name parameter fail !!!";
         }
+
+        #region Generate Struct Component From Interface
         
         private void GenerateStructComponentFromInterface(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
@@ -357,15 +389,17 @@ namespace AbilitySourceGenerator
             HeaderData interfaceHeaderData = GetHeader(interfaceDeclarationSyntax, scriptName);
             List<ISymbol> allMemberSymbols = Utils.GetAllMemberSymbols(context, interfaceDeclarationSyntax);
             
+            List<StructData> structDataListToBuildMergedField = BuildStructsDataToBuildMergedField(context, syntaxReceiver, interfaceHeaderData, interfaceDeclarationSyntax);
+            
             List<StructData> structDataList = BuildStructsData(context, syntaxReceiver, interfaceHeaderData, interfaceDeclarationSyntax);
             
-            if (structDataList == null || structDataList.Count == 0)
+            if (structDataList == null || structDataList.Count == 0 || structDataListToBuildMergedField == null || structDataListToBuildMergedField.Count == 0)
             {
                 return;
             }
             
-            List<MergedFieldData> mergedFieldData = BuildMergedFields(structDataList);
-            SourceText mergedStruct = GenerateMergedStruct(interfaceHeaderData, allMemberSymbols, mergedFieldData, structDataList);
+            List<MergedFieldData> mergedFieldData = BuildMergedFieldsByRuleName(structDataListToBuildMergedField, out var debugString);
+            SourceText mergedStruct = GenerateMergedStruct(interfaceHeaderData, allMemberSymbols, mergedFieldData, structDataList, debugString);
 
             context.AddSource(scriptName, mergedStruct);
             
@@ -377,48 +411,66 @@ namespace AbilitySourceGenerator
             // DebugInEditorUnity(context, $"headerData.scriptName: {headerData.scriptName} \n headerData.interfaceName: {headerData.interfaceName}");
         }
 
-        private static HeaderData GetHeader(TypeDeclarationSyntax typeDeclarationSyntax, string scriptName)
-        {
-            var newUsing = Utils.GetNamespace(typeDeclarationSyntax);
-            var allUsing = new List<string>();
-            TryAddUsing(allUsing, "System");
-            if (!string.IsNullOrEmpty(newUsing))
-            {
-                TryAddUsing(allUsing, newUsing);
-            }
-
-            foreach (var usingDirectiveSyntax in typeDeclarationSyntax.SyntaxTree.GetCompilationUnitRoot().Usings)
-            {
-                TryAddUsing(allUsing, usingDirectiveSyntax.Name.ToString());
-            }
-
-            return new HeaderData()
-            {
-                interfaceName = typeDeclarationSyntax.Identifier.ToString(),
-                scriptName = scriptName,
-                nameSpace = newUsing,
-                usingDirectives = allUsing,
-            };
-        }
-
-        private static void TryAddUsing(List<string> allUsing, string newUsing)
-        {
-            if (allUsing.Contains(newUsing))
-            {
-                return;
-            }
-            
-            allUsing.Add(newUsing);
-        }
-
-        private List<StructData> BuildStructsDataFromInitializeData(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, HeaderData headerData, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
+        private List<StructData> BuildStructsDataToBuildMergedField(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, HeaderData headerData, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
         {
             List<StructData> structDataList = new List<StructData>();
-            foreach (var structDeclarationSyntax in syntaxReceiver.initializeDataStructs)
+
+            foreach (var initializeDataStructPair in syntaxReceiver.initializeDataStructs)
             {
-                SyntaxToken identifier1 = interfaceDeclarationSyntax.Identifier;
-                string interfaceName = identifier1.Text;
+                var componentNameToGenerate = initializeDataStructPair.Key;
+                SyntaxToken interfaceIdentifier = interfaceDeclarationSyntax.Identifier;
+                var interfaceName = interfaceIdentifier.Text;
+                if (componentNameToGenerate != interfaceName.Substring(1))
+                {
+                    continue;
+                }
+
+                foreach (var structDeclarationSyntax in initializeDataStructPair.Value)
+                {
+                    SyntaxToken structIdentifier = structDeclarationSyntax.Identifier;
+                    if (structIdentifier.Text.Equals(headerData.scriptName))
+                    {
+                        continue;
+                    }
+                    
+                    StructData structData = new StructData
+                    {
+                        nameSpace = Utils.GetNamespace(structDeclarationSyntax),
+                        structName = structDeclarationSyntax.Identifier.ToString()
+                    };
+                    foreach (var usingDirectiveSyntax in interfaceDeclarationSyntax.SyntaxTree.GetCompilationUnitRoot().Usings)
+                    {
+                        TryAddUsing(headerData.usingDirectives, usingDirectiveSyntax.Name.ToString());
+                    }
+
+                    SemanticModel semanticModel = context.Compilation.GetSemanticModel(structDeclarationSyntax.SyntaxTree);
+                    INamedTypeSymbol namedTypeSymbol = semanticModel.GetDeclaredSymbol(structDeclarationSyntax);
+
+                    List<IFieldSymbol> fieldSymbolList = namedTypeSymbol?.GetMembers().Where(it => it.Kind == SymbolKind.Field).Cast<IFieldSymbol>().ToList();
+                    if (fieldSymbolList != null)
+                    {
+                        foreach (var fieldSymbol in fieldSymbolList)
+                        {
+                            string typeName = fieldSymbol.Type.Name;
+                            
+                            if (!structData.fieldsByTypeNameDict.ContainsKey(typeName))
+                            {
+                                structData.fieldsByTypeNameDict.Add(typeName, new List<StructFieldData>());
+                            }
+                            
+                            structData.fieldsByTypeNameDict[typeName].Add(new StructFieldData()
+                            {
+                                fieldSymbol = fieldSymbol,
+                                typeName = fieldSymbol.Type.Name,
+                                fieldName = MapFieldNameToProperty(fieldSymbol)
+                            });
+                        }
+                    }
+                    
+                    structDataList.Add(structData);
+                }
             }
+            
             return structDataList;
         }
         
@@ -444,87 +496,164 @@ namespace AbilitySourceGenerator
                         {
                             TryAddUsing(headerData.usingDirectives, usingDirectiveSyntax.Name.ToString());
                         }
-
-                        SemanticModel semanticModel = context.Compilation.GetSemanticModel(interfaceDeclarationSyntax.SyntaxTree);
-                        INamedTypeSymbol namedTypeSymbol = semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax);
-
-                        List<IFieldSymbol> fieldSymbolList = namedTypeSymbol?.GetMembers().Where(it => it.Kind == SymbolKind.Field).Cast<IFieldSymbol>().ToList();
-                        if (fieldSymbolList != null)
-                        {
-                            foreach (var fieldSymbol in fieldSymbolList)
-                            {
-                                structData.fields.Add(new StructFieldData()
-                                {
-                                    typeName = fieldSymbol.Type.Name,
-                                    fieldName = MapFieldNameToProperty(fieldSymbol)
-                                });
-                            }
-                        }
-
+        
+                        // SemanticModel semanticModel = context.Compilation.GetSemanticModel(interfaceDeclarationSyntax.SyntaxTree);
+                        // INamedTypeSymbol namedTypeSymbol = semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax);
+        
+                        // List<IFieldSymbol> fieldSymbolList = namedTypeSymbol?.GetMembers().Where(it => it.Kind == SymbolKind.Field).Cast<IFieldSymbol>().ToList();
+                        // if (fieldSymbolList != null)
+                        // {
+                        //     foreach (var fieldSymbol in fieldSymbolList)
+                        //     {
+                        //         structData.fields.Add(new StructFieldData()
+                        //         {
+                        //             fieldSymbol = fieldSymbol,
+                        //             typeName = fieldSymbol.Type.Name,
+                        //             fieldName = MapFieldNameToProperty(fieldSymbol)
+                        //         });
+                        //     }
+                        // }
+        
                         structDataList.Add(structData);
                     }
                 }
             }
-
+        
             return structDataList;
         }
 
-        private static string MapFieldNameToProperty(IFieldSymbol fieldSymbol) =>
-            fieldSymbol.AssociatedSymbol is IPropertySymbol associatedSymbol ? associatedSymbol.Name : fieldSymbol.Name;
-        
-        private List<MergedFieldData> BuildMergedFields(List<StructData> structDataList)
+        private List<MergedFieldData> BuildMergedFieldsByRuleName(List<StructData> structComponentDataList, out string debugString)
         {
+            debugString = "";
             List<MergedFieldData> mergedFieldDataList = new List<MergedFieldData>();
-            List<int> intList = new List<int>();
-            foreach (var structData in structDataList)
+            
+            Dictionary<string, List<MergedFieldData>> mergedFieldDataByTypeNameDict = new Dictionary<string, List<MergedFieldData>>();
+            
+            foreach (var structData in structComponentDataList)
             {
-                intList.Clear();
-                foreach (var field in structData.fields)
+                debugString += $"// structName : {structData.structName} - fieldsByTypeNameDict : {structData.fieldsByTypeNameDict.Count}\n";
+                
+                foreach (var fieldByTypeNamePair in structData.fieldsByTypeNameDict)
                 {
-                    int index2 = -1;
-                    for (int index3 = 0; index3 < mergedFieldDataList.Count; ++index3)
+                    string typeName = fieldByTypeNamePair.Key;
+                    List<StructFieldData> fieldDataByTypeList = fieldByTypeNamePair.Value;
+                    int numberField = fieldDataByTypeList.Count;
+                    
+                    if (!mergedFieldDataByTypeNameDict.ContainsKey(typeName))
                     {
-                        if (!intList.Contains(index3) &&
-                            string.Equals(field.typeName, mergedFieldDataList[index3].typeName))
+                        mergedFieldDataByTypeNameDict.Add(typeName, new List<MergedFieldData>());
+                        
+                        for (int idx = 0; idx < numberField; idx++)
                         {
-                            index2 = index3;
-                            break;
-                        }
-                    }
+                            int numberParameter = idx / 4;
+                            int indexInParameter = idx % 4;
+                            StructFieldData fieldData = fieldDataByTypeList[idx];
+                            
+                            if (fieldData.fieldSymbol == null)
+                            {
+                                continue;
+                            }
 
-                    if (index2 < 0)
-                    {
-                        int count = mergedFieldDataList.Count;
-                        MergedFieldData mergedFieldData = new MergedFieldData
-                        {
-                            typeName = field.typeName,
-                            fieldName = $"{field.typeName}_{mergedFieldDataList.Count}"
-                        };
-                        mergedFieldData.fieldNameForStructName.Add(structData.structName, field.fieldName);
-                        mergedFieldDataList.Add(mergedFieldData);
-                        field.mergedFieldName = mergedFieldData.fieldName;
-                        intList.Add(count);
+                            string fieldName = GetFieldNameByRule(fieldData.fieldSymbol, typeName, numberParameter, indexInParameter);
+                            mergedFieldDataByTypeNameDict[typeName].Add(new MergedFieldData()
+                            {
+                                typeName = typeName,
+                                fieldName = fieldName,
+                            });
+                        }
                     }
                     else
                     {
-                        MergedFieldData mergedFieldData = mergedFieldDataList[index2];
-                        mergedFieldData.fieldNameForStructName.Add(structData.structName, field.fieldName);
-                        field.mergedFieldName = mergedFieldData.fieldName;
-                        intList.Add(index2);
+                        int numberMergedField = mergedFieldDataByTypeNameDict[typeName].Count;
+                        if (numberMergedField < numberField)
+                        {
+                            for (int idx = numberMergedField; idx < numberField; idx++)
+                            {
+                                int numberParameter = idx / 4;
+                                int indexInParameter = idx % 4;
+                                StructFieldData fieldData = fieldDataByTypeList[idx];
+                            
+                                if (fieldData.fieldSymbol == null)
+                                {
+                                    continue;
+                                }
+
+                                string fieldName = GetFieldNameByRule(fieldData.fieldSymbol, typeName, numberParameter, indexInParameter);
+                                mergedFieldDataByTypeNameDict[typeName].Add(new MergedFieldData()
+                                {
+                                    typeName = typeName,
+                                    fieldName = fieldName,
+                                });
+                            }
+                        }
                     }
                 }
             }
 
+            if (mergedFieldDataByTypeNameDict.Count > 0)
+            {
+                foreach (var pair in mergedFieldDataByTypeNameDict)
+                {
+                    mergedFieldDataList.AddRange(pair.Value);
+                }
+            }
+            
             return mergedFieldDataList;
         }
         
+        // private List<MergedFieldData> BuildMergedFields(List<StructData> structComponentDataList)
+        // {
+        //     List<MergedFieldData> mergedFieldDataList = new List<MergedFieldData>();
+        //     List<int> intList = new List<int>();
+        //     foreach (var structData in structComponentDataList)
+        //     {
+        //         intList.Clear();
+        //         foreach (var field in structData.fields)
+        //         {
+        //             int index2 = -1;
+        //             for (int index3 = 0; index3 < mergedFieldDataList.Count; ++index3)
+        //             {
+        //                 if (!intList.Contains(index3) &&
+        //                     string.Equals(field.typeName, mergedFieldDataList[index3].typeName))
+        //                 {
+        //                     index2 = index3;
+        //                     break;
+        //                 }
+        //             }
+        //
+        //             if (index2 < 0)
+        //             {
+        //                 int count = mergedFieldDataList.Count;
+        //                 MergedFieldData mergedFieldData = new MergedFieldData
+        //                 {
+        //                     typeName = field.typeName,
+        //                     fieldName = $"{field.typeName}_{mergedFieldDataList.Count}"
+        //                 };
+        //                 mergedFieldData.fieldNameForStructName.Add(structData.structName, field.fieldName);
+        //                 mergedFieldDataList.Add(mergedFieldData);
+        //                 field.mergedFieldName = mergedFieldData.fieldName;
+        //                 intList.Add(count);
+        //             }
+        //             else
+        //             {
+        //                 MergedFieldData mergedFieldData = mergedFieldDataList[index2];
+        //                 mergedFieldData.fieldNameForStructName.Add(structData.structName, field.fieldName);
+        //                 field.mergedFieldName = mergedFieldData.fieldName;
+        //                 intList.Add(index2);
+        //             }
+        //         }
+        //     }
+        //
+        //     return mergedFieldDataList;
+        // }
+        
         private SourceText GenerateMergedStruct(HeaderData headerData, List<ISymbol> allMemberSymbols, List<MergedFieldData> mergedFieldData,
-            List<StructData> structDataList)
+            List<StructData> structDataList, string debugString)
         {
             FileWriter fileWriter = new FileWriter();
             GenerateUsingDirectives(fileWriter, headerData);
             fileWriter.WriteLine("");
-            bool useNameSpace = !string.IsNullOrEmpty(headerData.nameSpace) ? true : false;
+            bool useNameSpace = !string.IsNullOrEmpty(headerData.nameSpace);
             if (useNameSpace)
             {
                 fileWriter.WriteLine($"namespace {headerData.nameSpace}");
@@ -533,12 +662,19 @@ namespace AbilitySourceGenerator
             
             GenerateTypeEnum(fileWriter, structDataList);
             fileWriter.WriteLine("");
+            
             GenerateStructHeader(fileWriter, headerData);
             fileWriter.BeginScope();
+            
             GenerateFields(fileWriter, mergedFieldData);
             fileWriter.WriteLine("");
+
+            fileWriter.WriteLine($"{debugString}");
+            fileWriter.WriteLine("");
+            
             GenerateMethods(fileWriter, headerData, allMemberSymbols, structDataList);
             fileWriter.WriteLine("");
+            
             fileWriter.EndScope();
             
             if (useNameSpace)
@@ -547,14 +683,6 @@ namespace AbilitySourceGenerator
             }
             
             return SourceText.From(fileWriter.FileContents, Encoding.UTF8);
-        }
-        
-        private static void GenerateUsingDirectives(FileWriter mergedStructWriter, HeaderData headerData)
-        {
-            foreach (string usingDirective in headerData.usingDirectives)
-            {
-                mergedStructWriter.WriteLine($"using {usingDirective};");
-            }
         }
         
         private void GenerateStructHeader(FileWriter structWriter, HeaderData headerData)
@@ -577,6 +705,14 @@ namespace AbilitySourceGenerator
         private void GenerateFields(FileWriter structWriter, List<MergedFieldData> mergedFields)
         {
             structWriter.WriteLine("public UnitAbilityPolymorphismType currentUnitAbilityPolymorphismType;");
+            
+            if (mergedFields == null || mergedFields.Count == 0)
+            {
+                structWriter.WriteLine("");
+                structWriter.WriteLine($"// Merged fields null !!!");
+                structWriter.WriteLine("");
+            }
+            
             foreach (var mergedField in mergedFields)
             {
                 structWriter.WriteLine($"public {mergedField.typeName} {mergedField.fieldName};");
@@ -614,6 +750,54 @@ namespace AbilitySourceGenerator
                     }
                     structWriter.EndScope();
                 }
+                structWriter.WriteLine("");
+            }
+        }
+        
+        #endregion
+
+        private static HeaderData GetHeader(TypeDeclarationSyntax typeDeclarationSyntax, string scriptName)
+        {
+            var newUsing = Utils.GetNamespace(typeDeclarationSyntax);
+            var allUsing = new List<string>();
+            TryAddUsing(allUsing, "System");
+            if (!string.IsNullOrEmpty(newUsing))
+            {
+                TryAddUsing(allUsing, newUsing);
+            }
+
+            foreach (var usingDirectiveSyntax in typeDeclarationSyntax.SyntaxTree.GetCompilationUnitRoot().Usings)
+            {
+                TryAddUsing(allUsing, usingDirectiveSyntax.Name.ToString());
+            }
+
+            return new HeaderData()
+            {
+                interfaceName = typeDeclarationSyntax.Identifier.ToString(),
+                scriptName = scriptName,
+                nameSpace = newUsing,
+                usingDirectives = allUsing,
+            };
+        }
+
+        private static void TryAddUsing(List<string> allUsing, string newUsing)
+        {
+            if (allUsing.Contains(newUsing))
+            {
+                return;
+            }
+            
+            allUsing.Add(newUsing);
+        }
+
+        private static string MapFieldNameToProperty(IFieldSymbol fieldSymbol) =>
+            fieldSymbol.AssociatedSymbol is IPropertySymbol associatedSymbol ? associatedSymbol.Name : fieldSymbol.Name;
+        
+        private static void GenerateUsingDirectives(FileWriter mergedStructWriter, HeaderData headerData)
+        {
+            foreach (string usingDirective in headerData.usingDirectives)
+            {
+                mergedStructWriter.WriteLine($"using {usingDirective};");
             }
         }
         
