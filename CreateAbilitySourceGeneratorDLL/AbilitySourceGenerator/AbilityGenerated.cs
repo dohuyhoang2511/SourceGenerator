@@ -105,11 +105,16 @@ namespace AbilitySourceGenerator
         }
 
         #region Generate Struct Polymorphism From Initialize Data
+
+        private string GetStructPolymorphismNameFromStructInitializeData(string initializeStructName)
+        {
+            return initializeStructName.Substring(0, initializeStructName.Length - 14);
+        }
         
         private void GenerateStructPolymorphismFromInitializeData(GeneratorExecutionContext context, string targetStructPointer, StructDeclarationSyntax structDeclarationSyntax, List<StructFieldData> allFields)
         {
             SyntaxToken identifier = structDeclarationSyntax.Identifier;
-            var scriptName = identifier.Text.Substring(0, identifier.Text.Length - 14);
+            var scriptName = GetStructPolymorphismNameFromStructInitializeData(identifier.Text);
             HeaderData headerData = GetHeader(structDeclarationSyntax, scriptName);
             
             SourceText sourceText = BuildPartialPropertyStruct(headerData, targetStructPointer, allFields);
@@ -133,7 +138,7 @@ namespace AbilitySourceGenerator
                     result.Add(new StructFieldData()
                     {
                         fieldSymbol = fieldSymbol,
-                        typeName = fieldSymbol.Type.Name,
+                        typeName = ConvertFieldTypeName(fieldSymbol.Type.TypeKind, fieldSymbol.Type.Name),
                         fieldName = MapFieldNameToProperty(fieldSymbol),
                     });
                 }
@@ -210,16 +215,16 @@ namespace AbilitySourceGenerator
                         if (structFieldData.fieldSymbol != null)
                         {
                             var typeKind = structFieldData.fieldSymbol.Type.TypeKind;
-                            var fieldTypeName = typeKind == TypeKind.Enum ? mergedFieldPairData.Key : ConvertFieldTypeName(typeKind, mergedFieldPairData.Key);
-                            var fieldName = GetFieldNameByRule(typeKind, fieldTypeName, numberParameter, indexInParameter);
+                            var typeName = typeKind == TypeKind.Enum ? structFieldData.fieldSymbol.Type.Name : structFieldData.typeName;
+                            var fieldName = GetFieldNameByRule(typeKind, typeName, numberParameter, indexInParameter);
                     
                             // fileWriter.WriteLine($"// TypeKind: {structFieldData.fieldSymbol.Type.TypeKind}");
-                            fileWriter.WriteLine($"public {fieldTypeName} {structFieldData.fieldName}");
+                            fileWriter.WriteLine($"public {typeName} {structFieldData.fieldName}");
                             fileWriter.BeginScope();
                     
                             if (typeKind == TypeKind.Enum)
                             {
-                                fileWriter.WriteLine($"get => ({structFieldData.typeName}){structPointerFieldName}->{fieldName};");
+                                fileWriter.WriteLine($"get => ({typeName}){structPointerFieldName}->{fieldName};");
                                 fileWriter.WriteLine($"set => {structPointerFieldName}->{fieldName} = ({ParseFromEnumType()})value;");
                             }
                             else if (typeKind == TypeKind.Struct)
@@ -298,7 +303,7 @@ namespace AbilitySourceGenerator
             fileWriter.WriteLine($"public unsafe partial struct {headerData.scriptName}");
             fileWriter.BeginScope();
             
-            GenerateMethodInitializeData(fileWriter, targetStructPointer, allFields);
+            GenerateMethodInitializeData(fileWriter, targetStructPointer, allFields, headerData);
             
             fileWriter.EndScope();
             
@@ -310,13 +315,13 @@ namespace AbilitySourceGenerator
             return SourceText.From(fileWriter.FileContents, Encoding.UTF8);
         }
 
-        private void GenerateMethodInitializeData(FileWriter fileWriter, string targetStructPointer, List<StructFieldData> allFields)
+        private void GenerateMethodInitializeData(FileWriter fileWriter, string targetStructPointer, List<StructFieldData> allFields, HeaderData headerData)
         {
             fileWriter.WriteLine($"public {targetStructPointer} InitializeData()");
             fileWriter.BeginScope();
             
             fileWriter.WriteLine($"var data = new {targetStructPointer}();");
-
+            fileWriter.WriteLine($"data.currentUnitAbilityPolymorphismType = UnitAbilityPolymorphismType.{GetStructPolymorphismNameFromStructInitializeData(headerData.scriptName)};");
             var mergedFields = BuildMergedFieldsFromStructInitialized(allFields);
             if (mergedFields.Count > 0)
             {
@@ -333,8 +338,7 @@ namespace AbilitySourceGenerator
                         if (structFieldData.fieldSymbol != null)
                         {
                             var typeKind = structFieldData.fieldSymbol.Type.TypeKind;
-                            var fieldTypeName = ConvertFieldTypeName(typeKind, mergedFieldPairData.Key);
-                            var fieldName = GetFieldNameByRule(structFieldData.fieldSymbol.Type.TypeKind, fieldTypeName, numberParameter, indexInParameter);
+                            var fieldName = GetFieldNameByRule(structFieldData.fieldSymbol.Type.TypeKind, structFieldData.typeName, numberParameter, indexInParameter);
                             
                             if (typeKind == TypeKind.Enum)
                             {

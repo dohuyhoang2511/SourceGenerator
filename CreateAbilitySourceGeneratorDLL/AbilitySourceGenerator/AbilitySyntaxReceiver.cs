@@ -25,11 +25,7 @@ namespace AbilitySourceGenerator
                     polymorphicInterfaces.Add(interfaceStatementSyntax);
                     break;
                 case StructDeclarationSyntax structDeclarationSyntax:
-                    if (Utils.HasAttribute(structDeclarationSyntax, "AbilityGenerateStruct"))
-                    {
-                        polymorphicStructs.Add(structDeclarationSyntax);
-                    }
-                    else if (Utils.HasAttribute(structDeclarationSyntax, "AbilityGenerateInitializeData", out var argumentString))
+                    if (Utils.HasAttribute(structDeclarationSyntax, "AbilityGenerateInitializeData", out var argumentString))
                     {
                         argumentString = argumentString.Replace("\"", "");
                         if (!initializeDataStructs.ContainsKey(argumentString))
@@ -37,6 +33,10 @@ namespace AbilitySourceGenerator
                             initializeDataStructs.Add(argumentString, new List<StructDeclarationSyntax>());
                         }
                         initializeDataStructs[argumentString].Add(structDeclarationSyntax);
+                    }
+                    else
+                    {
+                        polymorphicStructs.Add(structDeclarationSyntax);
                     }
                     break;
                 default:
