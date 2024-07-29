@@ -698,7 +698,7 @@ namespace AbilitySourceGenerator
                 fileWriter.BeginScope();
             }
             
-            GenerateTypeEnum(fileWriter, structDataList);
+            GenerateTypeEnum(fileWriter, structDataList, headerData);
             fileWriter.WriteLine("");
             
             GenerateStructHeader(fileWriter, headerData);
@@ -727,10 +727,12 @@ namespace AbilitySourceGenerator
             structWriter.WriteLine($"public unsafe partial struct {headerData.scriptName} : {headerData.interfaceName}");
         }
         
-        private void GenerateTypeEnum(FileWriter structWriter, List<StructData> structDataList)
+        private void GenerateTypeEnum(FileWriter structWriter, List<StructData> structDataList, HeaderData headerData)
         {
-            structWriter.WriteLine("public enum UnitAbilityPolymorphismType");
+            string enumName = headerData.scriptName.Replace("Component", "Type");
+            structWriter.WriteLine($"public enum {enumName}");
             structWriter.BeginScope();
+            structWriter.WriteLine("None,");
             foreach (var structData in structDataList)
             {
                 structWriter.WriteLine($"{structData.structName},");
