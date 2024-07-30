@@ -319,9 +319,12 @@ namespace AbilitySourceGenerator
         {
             fileWriter.WriteLine($"public {targetStructPointer} InitializeData()");
             fileWriter.BeginScope();
-            
+
+            string enumName = targetStructPointer.Replace("Component", "Type");
+            string fieldEnumName = $"current{enumName}";
+                
             fileWriter.WriteLine($"var data = new {targetStructPointer}();");
-            fileWriter.WriteLine($"data.currentUnitAbilityPolymorphismType = UnitAbilityPolymorphismType.{GetStructPolymorphismNameFromStructInitializeData(headerData.scriptName)};");
+            fileWriter.WriteLine($"data.{fieldEnumName} = {enumName}.{GetStructPolymorphismNameFromStructInitializeData(headerData.scriptName)};");
             var mergedFields = BuildMergedFieldsFromStructInitialized(allFields);
             if (mergedFields.Count > 0)
             {
@@ -704,7 +707,7 @@ namespace AbilitySourceGenerator
             GenerateStructHeader(fileWriter, headerData);
             fileWriter.BeginScope();
             
-            GenerateFields(fileWriter, mergedFieldData);
+            GenerateFields(fileWriter, headerData, mergedFieldData);
             fileWriter.WriteLine("");
             
             GenerateMethods(fileWriter, headerData, allMemberSymbols, structDataList);
@@ -740,9 +743,12 @@ namespace AbilitySourceGenerator
             structWriter.EndScope();
         }
         
-        private void GenerateFields(FileWriter structWriter, List<MergedFieldData> mergedFields)
+        private void GenerateFields(FileWriter structWriter, HeaderData headerData, List<MergedFieldData> mergedFields)
         {
-            structWriter.WriteLine("public UnitAbilityPolymorphismType currentUnitAbilityPolymorphismType;");
+            string enumTypeName = headerData.scriptName.Replace("Component", "Type");
+            string fieldName = $"current{enumTypeName}";
+            
+            structWriter.WriteLine($"public {enumTypeName} {fieldName};");
             
             if (mergedFields == null || mergedFields.Count == 0)
             {
@@ -861,17 +867,18 @@ namespace AbilitySourceGenerator
             structWriter.BeginScope();
             structWriter.WriteLine($"fixed({headerData.scriptName}* ptr = &this)");
             structWriter.BeginScope();
-            structWriter.WriteLine("switch(currentUnitAbilityPolymorphismType)");
+            string enumName = headerData.scriptName.Replace("Component", "Type");
+            string fieldEnumName = $"current{enumName}";
+            structWriter.WriteLine($"switch({fieldEnumName})");
             structWriter.BeginScope();
             bool returnsVoid = methodSymbol.ReturnsVoid;
             foreach (var structData in structDataList)
             {
-                structWriter.WriteLine($"case UnitAbilityPolymorphismType.{structData.structName}:");
+                structWriter.WriteLine($"case {enumName}.{structData.structName}:");
                 structWriter.BeginScope();
                 string str = $"instance_{structData.structName}";
                 structWriter.WriteLine($"{structData.structName} {str} = new {structData.structName}(ptr);");
                 structWriter.WriteLine((returnsVoid ? "" : "var r = ") + $"{str}.{callClause};");
-                // structWriter.WriteLine($"{str}.To{headerData.scriptName}(ref this);");
                 structWriter.WriteLine(returnsVoid ? "break;" : "return r;");
                 structWriter.EndScope();
             }
