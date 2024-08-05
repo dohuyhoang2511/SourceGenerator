@@ -85,12 +85,21 @@ namespace AbilitySourceGenerator
                     string targetStructPointerName = pair.Key;
                     List<StructDeclarationSyntax> structDeclarationSyntaxList = pair.Value;
 
+                    int polymorphicStructIndex = syntaxReceiver.polymorphicStructs.FindIndex(structData =>
+                        structData.Identifier.ToString() == targetStructPointerName);
+                    StructDeclarationSyntax polymorphicStruct = null;
+                    if (polymorphicStructIndex != -1)
+                    {
+                        polymorphicStruct = syntaxReceiver.polymorphicStructs[polymorphicStructIndex];
+                    }
+                    
                     foreach (var structDeclarationSyntax in structDeclarationSyntaxList)
                     {
-                        List<StructFieldData> allFields = GetAllFieldsOfStruct(context, structDeclarationSyntax);
+                        List<StructFieldData> allStructFields = GetAllFieldsOfStruct(context, structDeclarationSyntax);
+                        List<StructFieldData> allSharedFields = GetFieldsByAttribute(context, polymorphicStruct, "ShareField");
 
-                        GenerateStructPolymorphismFromInitializeData(context, targetStructPointerName, structDeclarationSyntax, allFields);
-                        GenerateStructInitializeData(context, targetStructPointerName, structDeclarationSyntax, allFields);
+                        GenerateStructPolymorphismFromInitializeData(context, targetStructPointerName, structDeclarationSyntax, allStructFields, allSharedFields);
+                        GenerateStructInitializeData(context, targetStructPointerName, structDeclarationSyntax, allStructFields, allSharedFields);
                     }
                 }
             }
@@ -111,13 +120,13 @@ namespace AbilitySourceGenerator
             return initializeStructName.Substring(0, initializeStructName.Length - 14);
         }
         
-        private void GenerateStructPolymorphismFromInitializeData(GeneratorExecutionContext context, string targetStructPointer, StructDeclarationSyntax structDeclarationSyntax, List<StructFieldData> allFields)
+        private void GenerateStructPolymorphismFromInitializeData(GeneratorExecutionContext context, string targetStructPointer, StructDeclarationSyntax structDeclarationSyntax, List<StructFieldData> allStructFields, List<StructFieldData> allSharedFields)
         {
             SyntaxToken identifier = structDeclarationSyntax.Identifier;
             var scriptName = GetStructPolymorphismNameFromStructInitializeData(identifier.Text);
             HeaderData headerData = GetHeader(structDeclarationSyntax, scriptName);
             
-            SourceText sourceText = BuildPartialPropertyStruct(headerData, targetStructPointer, allFields);
+            SourceText sourceText = BuildPartialPropertyStruct(headerData, targetStructPointer, allStructFields,allSharedFields);
             
             context.AddSource(scriptName, sourceText);
         }
@@ -147,7 +156,7 @@ namespace AbilitySourceGenerator
             return result;
         }
         
-        private SourceText BuildPartialPropertyStruct(HeaderData headerData, string targetStructPointer, List<StructFieldData> allFields)
+        private SourceText BuildPartialPropertyStruct(HeaderData headerData, string targetStructPointer, List<StructFieldData> allStructFields, List<StructFieldData> allSharedFields)
         {
             FileWriter fileWriter = new FileWriter();
 
@@ -170,7 +179,9 @@ namespace AbilitySourceGenerator
             GenerateConstructorPointer(fileWriter, headerData, targetStructPointer, structPointerFieldName);
             fileWriter.WriteLine("");
             
-            GenerateGetSetProperty(fileWriter, allFields, structPointerFieldName);
+            GenerateGetSetPropertyFromStructFields(fileWriter, allStructFields, structPointerFieldName);
+            
+            GenerateGetSetPropertyFromShareFields(fileWriter, allSharedFields, structPointerFieldName);
             
             fileWriter.EndScope();
             
@@ -192,14 +203,14 @@ namespace AbilitySourceGenerator
             fileWriter.EndScope();
         }
         
-        private void GenerateGetSetProperty(FileWriter fileWriter, List<StructFieldData> allFields, string structPointerFieldName)
+        private void GenerateGetSetPropertyFromStructFields(FileWriter fileWriter, List<StructFieldData> allStructFields, string structPointerFieldName)
         {
-            if (allFields == null || allFields.Count == 0)
+            if (allStructFields == null || allStructFields.Count == 0)
             {
                 return;
             }
 
-            var mergedFields = BuildMergedFieldsFromStructInitialized(allFields);
+            var mergedFields = BuildMergedFieldsFromStructInitialized(allStructFields);
             if (mergedFields.Count > 0)
             {
                 foreach (var mergedFieldPairData in mergedFields)
@@ -245,6 +256,26 @@ namespace AbilitySourceGenerator
                 }
             }
         }
+
+        private void GenerateGetSetPropertyFromShareFields(FileWriter fileWriter, List<StructFieldData> allShareFields, string structPointerFieldName)
+        {
+            if (allShareFields == null || allShareFields.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var fieldData in allShareFields)
+            {
+                string typeName = fieldData.fieldSymbol?.Type.ToString();
+                string fieldName = fieldData.fieldName;
+                fileWriter.WriteLine($"public {typeName} {fieldName}");
+                fileWriter.BeginScope();
+                fileWriter.WriteLine($"get => {structPointerFieldName}->{fieldName};");
+                fileWriter.WriteLine($"set => {structPointerFieldName}->{fieldName} = value;");
+                fileWriter.EndScope();
+                fileWriter.WriteLine("");
+            }
+        }
         
         private Dictionary<string, List<StructFieldData>> BuildMergedFieldsFromStructInitialized(List<StructFieldData> allFields)
         {
@@ -274,18 +305,18 @@ namespace AbilitySourceGenerator
 
         #region Generate Initialize Data From Initialize Data
         
-        private void GenerateStructInitializeData(GeneratorExecutionContext context, string targetStructPointer, StructDeclarationSyntax structDeclarationSyntax, List<StructFieldData> allFields)
+        private void GenerateStructInitializeData(GeneratorExecutionContext context, string targetStructPointer, StructDeclarationSyntax structDeclarationSyntax, List<StructFieldData> allFields, List<StructFieldData> allSharedField)
         {
             SyntaxToken identifier = structDeclarationSyntax.Identifier;
             var scriptName = identifier.Text;
             HeaderData headerData = GetHeader(structDeclarationSyntax, scriptName);
 
-            SourceText sourceText = BuildPartialInitializeDataStruct(headerData, targetStructPointer, allFields);
+            SourceText sourceText = BuildPartialInitializeDataStruct(headerData, targetStructPointer, allFields, allSharedField);
             
             context.AddSource(scriptName, sourceText);
         }
 
-        private SourceText BuildPartialInitializeDataStruct(HeaderData headerData, string targetStructPointer, List<StructFieldData> allFields)
+        private SourceText BuildPartialInitializeDataStruct(HeaderData headerData, string targetStructPointer, List<StructFieldData> allFields, List<StructFieldData> allSharedField)
         {
             FileWriter fileWriter = new FileWriter();
 
@@ -300,10 +331,13 @@ namespace AbilitySourceGenerator
             }
             
             fileWriter.WriteLine($"// Script Generated");
+            fileWriter.WriteLine("[Serializable]");
             fileWriter.WriteLine($"public unsafe partial struct {headerData.scriptName}");
             fileWriter.BeginScope();
             
-            GenerateMethodInitializeData(fileWriter, targetStructPointer, allFields, headerData);
+            GenerateSharedField(fileWriter, allSharedField);
+            
+            GenerateMethodInitializeData(fileWriter, targetStructPointer, allFields, headerData, allSharedField);
             
             fileWriter.EndScope();
             
@@ -315,12 +349,60 @@ namespace AbilitySourceGenerator
             return SourceText.From(fileWriter.FileContents, Encoding.UTF8);
         }
 
-        private void GenerateMethodInitializeData(FileWriter fileWriter, string targetStructPointer, List<StructFieldData> allFields, HeaderData headerData)
+        private List<StructFieldData> GetFieldsByAttribute(GeneratorExecutionContext context, StructDeclarationSyntax polymorphicStruct, string attributeName)
+        {
+            attributeName += "Attribute";
+            var allSharedField = new List<StructFieldData>();
+
+            var allFields = GetAllFieldsOfStruct(context, polymorphicStruct);
+            
+            if (allFields == null || allFields.Count == 0)
+            {
+                return allSharedField;
+            }
+            
+            foreach (var fieldData in allFields)
+            {
+                if (fieldData.fieldSymbol == null)
+                {
+                    continue;
+                }
+                
+                var allAttribute = fieldData.fieldSymbol.GetAttributes().ToList();
+                foreach (var attributeData in allAttribute)
+                {
+                    if (attributeData.AttributeClass?.Name == attributeName)
+                    {
+                        allSharedField.Add(fieldData);
+                        break;
+                    }
+                }
+            }
+            
+            return allSharedField;
+        }
+        
+        private void GenerateSharedField(FileWriter fileWriter, List<StructFieldData> allSharedField)
+        {
+            if (allSharedField.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var fieldData in allSharedField)
+            {
+                fileWriter.WriteLine($"public {fieldData.fieldSymbol?.Type} {fieldData.fieldName};");
+            }
+            
+            fileWriter.WriteLine("");
+        }
+        
+        private void GenerateMethodInitializeData(FileWriter fileWriter, string targetStructPointer, List<StructFieldData> allFields, HeaderData headerData, List<StructFieldData> allSharedField)
         {
             fileWriter.WriteLine($"public {targetStructPointer} InitializeData()");
             fileWriter.BeginScope();
 
-            string enumName = targetStructPointer.Replace("Component", "Type");
+            string enumName = GetEnumTypeName(targetStructPointer);
             string fieldEnumName = $"current{enumName}";
                 
             fileWriter.WriteLine($"var data = new {targetStructPointer}();");
@@ -355,6 +437,14 @@ namespace AbilitySourceGenerator
                     }
                 }
             }
+
+            if (allSharedField.Count > 0)
+            {
+                foreach (var fieldData in allSharedField)
+                {
+                    fileWriter.WriteLine($"data.{fieldData.fieldName} = {fieldData.fieldName};");
+                }
+            }
             
             fileWriter.WriteLine($"return data;");
             fileWriter.EndScope();
@@ -362,6 +452,11 @@ namespace AbilitySourceGenerator
         
         #endregion
 
+        private static string GetEnumTypeName(string name)
+        {
+            return name.Replace("Component", "Type");
+        }
+        
         private string ParseFromEnumType()
         {
             return "int";
@@ -454,13 +549,6 @@ namespace AbilitySourceGenerator
             SourceText mergedStruct = GenerateMergedStruct(interfaceHeaderData, allMemberSymbols, mergedFieldData, structDataList);
 
             context.AddSource(scriptName, mergedStruct);
-            
-            // foreach (var structData in structDataList)
-            // {
-            //     GeneratePartialStruct(context, headerData.usingDirectives, headerData.scriptName, structData, mergedFieldData);  
-            // }
-            
-            // DebugInEditorUnity(context, $"headerData.scriptName: {headerData.scriptName} \n headerData.interfaceName: {headerData.interfaceName}");
         }
 
         private List<StructData> BuildStructsDataToBuildMergedField(GeneratorExecutionContext context, AbilitySyntaxReceiver syntaxReceiver, HeaderData headerData, InterfaceDeclarationSyntax interfaceDeclarationSyntax)
@@ -732,7 +820,8 @@ namespace AbilitySourceGenerator
         
         private void GenerateTypeEnum(FileWriter structWriter, List<StructData> structDataList, HeaderData headerData)
         {
-            string enumName = headerData.scriptName.Replace("Component", "Type");
+            string enumName = GetEnumTypeName(headerData.scriptName);
+            structWriter.WriteLine("[Serializable]");
             structWriter.WriteLine($"public enum {enumName}");
             structWriter.BeginScope();
             structWriter.WriteLine("None,");
@@ -745,7 +834,7 @@ namespace AbilitySourceGenerator
         
         private void GenerateFields(FileWriter structWriter, HeaderData headerData, List<MergedFieldData> mergedFields)
         {
-            string enumTypeName = headerData.scriptName.Replace("Component", "Type");
+            string enumTypeName = GetEnumTypeName(headerData.scriptName);
             string fieldName = $"current{enumTypeName}";
             
             structWriter.WriteLine($"public {enumTypeName} {fieldName};");
@@ -867,7 +956,7 @@ namespace AbilitySourceGenerator
             structWriter.BeginScope();
             structWriter.WriteLine($"fixed({headerData.scriptName}* ptr = &this)");
             structWriter.BeginScope();
-            string enumName = headerData.scriptName.Replace("Component", "Type");
+            string enumName = GetEnumTypeName(headerData.scriptName);
             string fieldEnumName = $"current{enumName}";
             structWriter.WriteLine($"switch({fieldEnumName})");
             structWriter.BeginScope();
