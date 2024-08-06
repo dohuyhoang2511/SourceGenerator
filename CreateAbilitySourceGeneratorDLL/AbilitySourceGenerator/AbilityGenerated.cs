@@ -78,6 +78,11 @@ namespace AbilitySourceGenerator
                 return;
             }
 
+            if (syntaxReceiver.polymorphicStructs.Count > 0)
+            {
+                GenerateEnumAllComponentData(context, syntaxReceiver.polymorphicStructs);
+            }
+            
             if (syntaxReceiver.initializeDataStructs.Count > 0)
             {
                 foreach (var pair in syntaxReceiver.initializeDataStructs)
@@ -96,7 +101,7 @@ namespace AbilitySourceGenerator
                     foreach (var structDeclarationSyntax in structDeclarationSyntaxList)
                     {
                         List<StructFieldData> allStructFields = GetAllFieldsOfStruct(context, structDeclarationSyntax);
-                        List<StructFieldData> allSharedFields = GetFieldsByAttribute(context, polymorphicStruct, "ShareField");
+                        List<StructFieldData> allSharedFields = GetFieldsByAttribute(context, polymorphicStruct, "AbilityShareField");
 
                         GenerateStructPolymorphismFromInitializeData(context, targetStructPointerName, structDeclarationSyntax, allStructFields, allSharedFields);
                         GenerateStructInitializeData(context, targetStructPointerName, structDeclarationSyntax, allStructFields, allSharedFields);
@@ -113,6 +118,53 @@ namespace AbilitySourceGenerator
             }
         }
 
+        #region Generate Enum All Component Data
+
+        private void GenerateEnumAllComponentData(GeneratorExecutionContext context, List<StructDeclarationSyntax> allStructs)
+        {
+            List<StructDeclarationSyntax> allComponentData =
+                allStructs.FindAll(structData => Utils.ImplementsInterface(structData, "IComponentData"));
+            
+            string scriptName = "AllComponentData";
+            SourceText sourceText = BuildEnumAllComponentData(allComponentData);
+            
+            context.AddSource(scriptName, sourceText);
+        }
+
+        private SourceText BuildEnumAllComponentData(List<StructDeclarationSyntax> allComponentData)
+        {
+            FileWriter fileWriter = new FileWriter();
+
+            fileWriter.WriteLine($"using System;");
+            fileWriter.WriteLine($"using System.Collections;");
+            fileWriter.WriteLine($"using System.Collections.Generic;");
+            fileWriter.WriteLine($"using Unity.Entities;");
+            fileWriter.WriteLine($"using UnityEngine;");
+            fileWriter.WriteLine("");
+
+            fileWriter.WriteLine($"namespace AMG");
+            fileWriter.BeginScope();
+            
+            fileWriter.WriteLine($"[Serializable]");
+            fileWriter.WriteLine($"public enum ComponentDataType");
+            fileWriter.BeginScope();
+            
+            fileWriter.WriteLine($"None,");
+            foreach (var structDeclarationSyntax in allComponentData)
+            {
+                string structName = structDeclarationSyntax.Identifier.ToString();
+                fileWriter.WriteLine($"{structName},");
+            }
+            
+            fileWriter.EndScope();
+            
+            fileWriter.EndScope();
+            
+            return SourceText.From(fileWriter.FileContents, Encoding.UTF8);
+        }
+        
+        #endregion
+        
         #region Generate Struct Polymorphism From Initialize Data
 
         private string GetStructPolymorphismNameFromStructInitializeData(string initializeStructName)
