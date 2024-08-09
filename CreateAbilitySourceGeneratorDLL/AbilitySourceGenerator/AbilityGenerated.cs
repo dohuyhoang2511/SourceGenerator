@@ -441,9 +441,12 @@ namespace AbilitySourceGenerator
                 return;
             }
 
+            int orderIndex = -999;
             foreach (var fieldData in allSharedField)
             {
-                fileWriter.WriteLine($"public {fieldData.fieldSymbol?.Type} {fieldData.fieldName};");
+                string titleGroup = $"[TitleGroup(\"Share Parameter\", Order = {orderIndex})]";
+                fileWriter.WriteLine($"{titleGroup} public {fieldData.fieldSymbol?.Type} {fieldData.fieldName};");
+                orderIndex++;
             }
             
             fileWriter.WriteLine("");
